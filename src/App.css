@@ -1,0 +1,39 @@
+#root {
+  height: 100vh;
+  width: 100vw;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+p {
+  text-align: left;
+}
+
+code {
+  display: inline-block;
+  padding: 0 .3em ;
+  color: light-dark(#000, #fff);
+  background-color: light-dark(#eee, #3a3a3a);
+}
+
+input {
+  margin: 0.4rem;
+}
+
+#radios {
+  float: left;
+  padding: 0 20px 20px 20px;
+}
+
+.starter-instructions {
+  color: light-dark(#333, #ccc);
+  text-align: left;
+  max-width: 800px;
+}
+
+#map {
+  height: 60%;
+  width: 100%;
+}
