@@ -10,17 +10,22 @@ export default function Auth() {
   const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const credentials = { email, password };
     let error;
 
     if (isSignUp) {
-      const { error: signUpError } = await supabase.auth.signUp(credentials);
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            emailRedirectTo: window.location.origin,
+        },
+      });
       error = signUpError;
       if (!error) {
         alert("Verifique seu e-mail para o link de confirmação!");
       }
     } else {
-      const { error: signInError } = await supabase.auth.signInWithPassword(credentials);
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       error = signInError;
     }
 
