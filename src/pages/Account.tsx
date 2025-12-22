@@ -5,6 +5,7 @@ import Avatar from "../Avatar";
 import { Session } from "@supabase/supabase-js";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { Link } from "react-router-dom";
 
 export default function Account({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
@@ -56,8 +57,10 @@ export default function Account({ session }: { session: Session }) {
     };
   }, [session]);
 
-  async function updateProfile(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function updateProfile(event: React.FormEvent<HTMLFormElement> | null) {
+    if (event) {
+      event.preventDefault();
+    }
 
     setLoading(true);
     const { user } = session;
@@ -74,38 +77,48 @@ export default function Account({ session }: { session: Session }) {
 
     if (error) {
       alert("Error updating the data!");
-      console.log(error)
+      console.log(error);
     } else {
-      alert("Profile updated successfully!");
+      // alert("Profile updated successfully!");
+      const { data: usersData, error: usersError } = await supabase
+        .from("profiles")
+        .select(`username, website, avatar_url`);
+      if (usersError) {
+        console.warn(usersError);
+      } else if (usersData) {
+        setUsers(usersData);
+      }
     }
     setLoading(false);
   }
 
-  const handleShareList = () => {
-    let shareText = "Lista de Contatos:\n";
-    users.forEach((user) => {
-      shareText += `${user.username} - ${user.website || "N/A"}\n`;
-    });
+  const handleCopyList = () => {
+    const userList = users.map((user) => user.username || "Unnamed User").join("\n");
+    navigator.clipboard
+      .writeText(userList)
+      .then(() => alert("Lista de usuários copiada!"))
+      .catch((err) => console.error("Falha ao copiar lista: ", err));
+  };
 
+  const handleShareList = () => {
+    const userList = users.map((user) => user.username || "Unnamed User").join("\n");
     if (navigator.share) {
       navigator
         .share({
-          title: "Lista de Contatos",
-          text: shareText,
+          title: "Lista de Usuários",
+          text: userList,
         })
-        .then(() => console.log("Successful share"))
-        .catch((error) => console.log("Error sharing", error));
+        .catch((err) => console.error("Erro ao compartilhar: ", err));
     } else {
-      alert("A função de compartilhamento não é suportada neste navegador.");
-      console.log(shareText);
+      alert("A função de compartilhar não é suportada neste navegador.");
     }
   };
 
   const generatePdf = () => {
     const input = document.getElementById("contacts-list");
     if (!input) {
-        alert("Não foi possível encontrar a lista para gerar o PDF.");
-        return;
+      alert("Não foi possível encontrar a lista para gerar o PDF.");
+      return;
     }
 
     html2canvas(input, { useCORS: true }).then((canvas) => {
@@ -120,47 +133,77 @@ export default function Account({ session }: { session: Session }) {
   };
 
   return (
-    <div className="form-widget">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Sua Conta</h1>
-        <div className="dropdown-container" style={{ position: "relative" }}>
-          <button
-            className="button primary"
-            onClick={() => setDropdownVisible(!dropdownVisible)}
-          >
-            Ações
-          </button>
-          {dropdownVisible && (
-            <div 
-              className="dropdown-menu"
-              style={{ 
-                position: "absolute", 
-                top: "100%", 
-                right: 0,
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                backgroundColor: "white",
-                zIndex: 1000
-              }}
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "1rem",
+        }}
+      >
+        <h1 className="header">Sua Conta</h1>
+        <div className="menu-buttons">
+          <div className="dropdown-container" style={{ position: "relative" }}>
+            <button
+              className="button primary"
+              onClick={() => setDropdownVisible(!dropdownVisible)}
             >
-              <button onClick={handleShareList} style={{ display: 'block', width: '100%', textAlign: 'left' }}>
-                Compartilhar Lista
-              </button>
-              <button onClick={generatePdf} style={{ display: 'block', width: '100%', textAlign: 'left' }}>
-                Gerar PDF da Lista
-              </button>
-            </div>
-          )}
+              Ações
+            </button>
+            {dropdownVisible && (
+              <div
+                className="dropdown-menu"
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  backgroundColor: "white",
+                  zIndex: 1000,
+                }}
+              >
+                <button
+                  onClick={() => { handleCopyList(); setDropdownVisible(false); }}
+                  style={{ display: "block", width: "100%", textAlign: "left" }}
+                >
+                  Copiar Lista
+                </button>
+                <button
+                  onClick={() => { handleShareList(); setDropdownVisible(false); }}
+                  style={{ display: "block", width: "100%", textAlign: "left" }}
+                >
+                  Compartilhar Lista
+                </button>
+                <button
+                  onClick={() => { generatePdf(); setDropdownVisible(false); }}
+                  style={{ display: "block", width: "100%", textAlign: "left" }}
+                >
+                  Gerar PDF da Lista
+                </button>
+              </div>
+            )}
+          </div>
+          <Link to="/chat" className="button primary">
+            Entrar
+          </Link>
+          <button
+            className="button button-logout"
+            type="button"
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sair
+          </button>
         </div>
       </div>
-
       <form onSubmit={updateProfile} className="form-widget">
         <Avatar
           url={avatar_url}
           size={150}
-          onUpload={(event: React.ChangeEvent<HTMLInputElement>, url: string) => {
+          onUpload={(url) => {
             setAvatarUrl(url);
-            updateProfile(event);
+            updateProfile(null);
           }}
         />
         <div>
@@ -168,17 +211,16 @@ export default function Account({ session }: { session: Session }) {
           <input id="email" type="text" value={session.user.email} disabled />
         </div>
         <div>
-          <label htmlFor="username">Usuário</label>
+          <label htmlFor="username">Name</label>
           <input
             id="username"
             type="text"
-            required
             value={username || ""}
             onChange={(e) => setUsername(e.target.value)}
           />
         </div>
         <div>
-          <label htmlFor="website">Link</label>
+          <label htmlFor="website">Website</label>
           <input
             id="website"
             type="url"
@@ -193,54 +235,22 @@ export default function Account({ session }: { session: Session }) {
             type="submit"
             disabled={loading}
           >
-            {loading ? "Salvando..." : "Salvar Perfil"}
+            {loading ? "Carregando ..." : "Atualizar Perfil"}
           </button>
         </div>
       </form>
-      
-      <div id="contacts-list">
-        <h2>Todos os Usuários</h2>
-        <table className="user-table">
-          <thead>
-            <tr>
-              <th>Avatar</th>
-              <th>Usuário</th>
-              <th>Link</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td>
-                  <img
-                    src={
-                      user.avatar_url
-                        ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${user.avatar_url}`
-                        : "https://via.placeholder.com/40"
-                    }
-                    alt={user.username}
-                    className="user-avatar"
-                  />
-                </td>
-                <td>{user.username}</td>
-                <td>
-                  <a href={user.website} target="_blank" rel="noopener noreferrer">
-                    {user.website}
-                  </a>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      <button
-        className="button block"
-        type="button"
-        onClick={() => supabase.auth.signOut()}
-      >
-        Sign Out
-      </button>
+      <div id="contacts-list" className="user-list-section">
+        <h2 className="header">Todos os Usuários</h2>
+        <div className="user-list">
+          {users.map((user, index) => (
+            <div key={index} className="user-list-item">
+              <Avatar url={user.avatar_url} size={50} readOnly={true} />
+              <span>{user.username || "Unnamed"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

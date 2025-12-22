@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Auth from './Auth'
-import Account from './Account'
+import Account from './pages/Account' 
+import ChatVideoRTC from './pages/ChatVideoRTC'
 import { Session } from '@supabase/supabase-js'
 import './App.css'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
+      setLoading(false);
     })
 
     const {
@@ -22,10 +26,19 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  if (loading) {
+    return <div>Carregando...</div>
+  }
+
   return (
-    <div className="container" style={{ padding: '50px 0 100px 0' }}>
-      {!session ? <Auth /> : <Account key={session.user.id} session={session} />}
-    </div>
+    <BrowserRouter>
+      <div className="container" style={{ padding: '50px 0 100px 0' }}>
+        <Routes>
+            <Route path="/chat" element={session ? <ChatVideoRTC /> : <Auth />} />
+            <Route path="/" element={!session ? <Auth /> : <Account key={session.user.id} session={session} />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   )
 }
 
