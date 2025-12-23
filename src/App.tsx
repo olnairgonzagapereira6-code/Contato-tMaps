@@ -33,7 +33,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="container">
+      <div className="App">
         <Routes>
             <Route path="/chat" element={session ? <ChatVideoRTC /> : <Auth />} />
             <Route path="/contacts" element={session ? <Contacts /> : <Auth />} />

@@ -1,525 +1,171 @@
-estu/* Estrutura Geral */
+/* === Estrutura Principal (Inspirado no WhatsApp) === */
 .chat-page-container {
-  display: flex;
-  height: 100%; /* Fill parent */
-  width: 100%; /* Fill parent */
-  font-family: Arial, sans-serif;
-  background-color: #f0f2f5;
-  overflow: hidden; /* Keep this to contain children */
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Ocupa a tela inteira */
+    width: 100vw;
+    background-color: #E5DDD5; /* Fundo padrão do WhatsApp */
+    background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); /* Padrão de fundo sutil */
 }
 
-/* --- BARRA LATERAL (LISTA DE USUÁRIOS) --- */
-.user-list-sidebar {
-  width: 280px; /* Levemente reduzido */
-  border-right: 1px solid #ccc;
-  display: flex;
-  flex-direction: column;
-  background-color: #fff;
-  transition: width 0.3s ease;
-}
-
-.user-list-sidebar.hidden {
-  width: 0;
-  overflow: hidden;
-  border-right: none;
-}
-
-.user-list-header {
-  padding: 16px;
-  font-size: 1.1em; /* Reduzido */
-  font-weight: bold;
-  border-bottom: 1px solid #eee;
-  text-align: center;
-}
-
-.user-list {
-  flex-grow: 1;
-  overflow-y: auto;
-}
-
-.user-list-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px; /* Reduzido */
-  cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.user-list-item:hover {
-  background-color: #f5f5f5;
-}
-
-.user-list-item.selected {
-  background-color: #e0e0e0;
-}
-
-.user-list-item span {
-  margin-left: 10px; /* Reduzido */
-  font-size: 0.95em; /* Reduzido */
-}
-
-/* --- ÁREA PRINCIPAL DO CHAT --- */
-.chat-area-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  transition: opacity 0.3s ease;
-}
-
-.chat-area-content.hidden {
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-}
-
-.main-chat {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
+/* === Cabeçalho (Barra Verde) === */
 .chat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 16px; /* Reduzido */
-  border-bottom: 1px solid #ccc;
-  background-color: #f8f9fa;
-}
-
-.user-details {
-  display: flex;
-  align-items: center;
-}
-
-.user-details span {
-  margin-left: 12px; /* Reduzido */
-  font-weight: bold;
-  font-size: 1.0em; /* Reduzido */
-}
-
-.chat-header-controls {
-  display: flex;
-  gap: 12px; /* Reduzido */
-}
-
-.contacts-button,
-.video-call-button,
-.delete-conversation-button {
-  padding: 7px 14px; /* Reduzido */
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.85em; /* Reduzido */
-  transition: background-color 0.2s;
-}
-
-.contacts-button {
-    background-color: #6c757d;
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    background-color: #075E54; /* Verde escuro do WhatsApp */
     color: white;
-}
-.contacts-button:hover {
-    background-color: #5a6268;
+    flex-shrink: 0; /* Impede que o cabeçalho encolha */
 }
 
-
-.video-call-button {
-  background-color: #28a745;
-  color: white;
+.avatar-container {
+    margin-right: 15px;
 }
 
-.video-call-button:hover {
-  background-color: #218838;
+.chat-with {
+    font-size: 1.1rem;
+    font-weight: 500;
 }
 
-.video-call-button:disabled {
-  background-color: #a3d9b1;
-  cursor: not-allowed;
+/* === Área das Mensagens (Conteúdo rolável) === */
+.messages-area {
+    flex-grow: 1; /* Ocupa todo o espaço restante */
+    overflow-y: auto; /* Permite rolar as mensagens */
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
 }
 
-.delete-conversation-button {
-  background-color: #dc3545;
-  color: white;
+.message-bubble {
+    max-width: 70%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    word-wrap: break-word;
+    position: relative;
 }
 
-.delete-conversation-button:hover {
-  background-color: #c82333;
+.message-bubble.sent {
+    background-color: #DCF8C6; /* Verde claro para mensagens enviadas */
+    align-self: flex-end; /* Alinha à direita */
+    text-align: right;
 }
 
-
-/* --- ÁREA DAS MENSAGENS --- */
-.message-area {
-  flex-grow: 1;
-  padding: 16px; /* Reduzido */
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px; /* Reduzido */
+.message-bubble.received {
+    background-color: #FFFFFF; /* Branco para mensagens recebidas */
+    align-self: flex-start; /* Alinha à esquerda */
+    text-align: left;
 }
 
-.message-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  max-width: 65%; /* Reduzido */
-  cursor: pointer; 
+.message-content {
+    margin: 0;
+    padding: 0;
 }
 
-.message {
-  padding: 8px 12px; /* Reduzido */
-  border-radius: 16px; /* Reduzido */
-  word-wrap: break-word;
-  max-width: 100%;
-  font-size: 0.95em; /* Reduzido */
-}
-
-.message p {
-  margin: 0;
-}
-
-.incoming-wrapper {
-  align-self: flex-start;
-}
-
-.incoming {
-  background-color: #e9e9eb;
-  color: #000;
-  border-top-left-radius: 0;
-}
-
-.outgoing-wrapper {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-
-.outgoing {
-  background-color: #007bff;
-  color: white;
-  border-top-right-radius: 0;
+.message-timestamp {
+    font-size: 0.75rem;
+    color: #808080; /* Cinza para o tempo */
+    display: block;
+    margin-top: 4px;
 }
 
 
-/* --- Botões de Ação da Mensagem --- */
-
-.delete-message-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.1em; /* Reduzido */
-  color: #888;
-  opacity: 0;
-  transition: opacity 0.2s ease, color 0.2s ease;
-  padding: 0 8px; /* Reduzido */
-  flex-shrink: 0;
+/* === Rodapé (Área de Input) === */
+.message-input-area {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f0f2f5; /* Cinza claro do rodapé */
+    flex-shrink: 0; /* Impede que o rodapé encolha */
 }
 
-.outgoing-wrapper:hover .delete-message-button {
-  opacity: 1; 
-}
-
-.delete-message-button:hover {
-  color: #dc3545;
-}
-
-.copy-message-button {
-  position: absolute;
-  top: -20px; 
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.6);
-  color: white;
-  border: none;
-  border-radius: 6px; /* Reduzido */
-  padding: 2px 8px; /* Reduzido */
-  font-size: 1.0em; /* Reduzido */
-  cursor: pointer;
-  z-index: 10;
-  opacity: 0.9;
-  transition: opacity 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-
-.copy-message-button:hover {
-  opacity: 1;
-  background-color: rgba(0, 0, 0, 0.8);
-}
-
-
-/* --- INPUT DE MENSAGEM --- */
-.message-input {
-  display: flex;
-  padding: 8px 16px; /* Reduzido */
-  border-top: 1px solid #ccc;
-  background-color: #f8f9fa;
-}
-
-.message-input form {
-  display: flex;
-  width: 100%;
-  gap: 8px; /* Reduzido */
-}
-
-.message-input input {
-  flex-grow: 1;
-  padding: 9px 15px; /* Reduzido */
-  border: 1px solid #ddd;
-  border-radius: 18px; /* Reduzido */
-}
-
-.message-input button {
-  padding: 9px 18px; /* Reduzido */
-  border: none;
-  background-color: #007bff;
-  color: white;
-  border-radius: 18px; /* Reduzido */
-  cursor: pointer;
-}
-
-.message-input button:hover {
-  background-color: #0056b3;
-}
-
-.message-input button:disabled {
-  background-color: #a0c7ff;
-  cursor: not-allowed;
-}
-
-.mic-button {
-    flex-shrink: 0;
-    margin-left: 8px;
-}
-
-.mic-button.recording {
-    background-color: #dc3545;
-}
-
-/* --- Placeholder (Sem conversa selecionada) --- */
-.chat-placeholder {
-  display: flex;
-  flex-direction: column; /* Para alinhar o botão abaixo do texto */
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  color: #777;
-  text-align: center;
-}
-
-.select-contact-button {
-    margin-top: 20px;
-    padding: 12px 25px;
-    font-size: 1em;
-    color: white;
-    background-color: #007bff;
+.message-input-area input {
+    flex-grow: 1;
+    padding: 10px 15px;
     border: none;
-    border-radius: 5px;
+    border-radius: 20px;
+    margin-right: 10px;
+    font-size: 1rem;
+}
+
+.message-input-area button {
+    padding: 10px;
+    border: none;
+    background-color: #075E54; /* Verde do WhatsApp */
+    color: white;
+    border-radius: 50%; /* Botão redondo */
     cursor: pointer;
-    transition: background-color 0.2s;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.select-contact-button:hover {
-    background-color: #0056b3;
+/* --- Estilos para Vídeo Chamada --- */
+.video-call-container {
+    background-color: #222;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
 }
 
-/* --- MODAL DE CHAMADA RECEBida --- */
-.incoming-call-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+.videos {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 10px;
 }
 
-.incoming-call-content {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  text-align: center;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+.videos video {
+    border-radius: 8px;
+    max-width: 48%;
 }
 
-.incoming-call-content h4 {
-  margin-top: 15px;
-  margin-bottom: 25px;
+.call-controls button {
+    margin: 0 5px;
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
 }
 
-.incoming-call-actions {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-
-.incoming-call-actions button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 1em;
-}
-
-.decline-button {
-  background-color: #dc3545;
-  color: white;
-}
-
-.accept-button {
-  background-color: #28a745;
-  color: white;
-}
-
-/* --- TELA DE VÍDEO --- */
-.video-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #1a1a1a;
-  z-index: 999;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.video-main {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.remote-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.local-video {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  width: 200px;
-  height: 150px;
-  border: 2px solid white;
-  border-radius: 5px;
-  background: #333;
-}
-
-.exit-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: rgba(44, 44, 44, 0.7);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  font-size: 1.5em;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1010;
-  transition: background-color 0.2s;
-}
-
-.exit-button:hover {
-  background: rgba(220, 53, 69, 0.8);
-}
-
-
-.call-controls {
-  position: absolute;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  display: flex;
-  gap: 20px;
-}
-
-.control-button {
-  background: rgba(44, 44, 44, 0.7);
-  border: none;
-  border-radius: 50%;
-  color: white;
-  width: 60px;
-  height: 60px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.2em;
-  transition: background-color 0.2s;
-}
-
-.end-call-button {
-  background-color: #dc3545;
-}
-
-.end-call-button:hover {
-  background-color: #c82333;
-}
+.call-controls .start-call { background-color: #25D366; color: white; }
+.call-controls .end-call { background-color: #FF3B30; color: white; }
 
 /* --- ESTILOS RESPONSIVOS PARA CELULAR --- */
 @media (max-width: 768px) {
-  .chat-page-container {
-      height: 100vh; /* Ocupa a tela inteira */
-      width: 100vw;
-      border-radius: 0;
-  }
+    .chat-page-container {
+        border-radius: 0;
+    }
 
-  .user-list-sidebar {
-    display: none; /* Esconde a lista de contatos por padrão */
-  }
+    .message-bubble {
+        max-width: 80%; /* Balões um pouco maiores no celular */
+    }
+}
 
-  .chat-area-content {
-    width: 100%;
-  }
-  
-  /* Quando não há usuário selecionado, mostramos a lista em vez do placeholder */
-  .chat-placeholder {
-      display: none; /* Esconde o placeholder */
-  }
-  
-  .chat-area-content:not(.hidden) + .user-list-sidebar {
-      display: flex; /* Esta regra pode precisar de ajuste dependendo da estrutura */
-      width: 100%;
-      left: 0;
-      z-index: 100;
-  }
+/* Ações da Mensagem (Copiar/Apagar) */
+.message-actions {
+    position: absolute;
+    top: -30px; /* Posiciona acima do balão */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #fff;
+    border-radius: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    z-index: 10;
+    overflow: hidden;
+}
 
-  .local-video {
-    width: 100px;
-    height: 75px;
-    right: 10px;
-    bottom: 80px;
-  }
+.message-actions button {
+    background: none;
+    color: #333;
+    border-radius: 0;
+    padding: 5px 10px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
 
-  .call-controls {
-    bottom: 15px;
-  }
-
-  .control-button {
-    width: 50px;
-    height: 50px;
-  }
-
-  .exit-button {
-    top: 15px;
-    left: 15px;
-  }
-
-  .message-wrapper {
-    max-width: 85%;
-  }
+.message-actions button:hover {
+    background-color: #f0f0f0;
 }

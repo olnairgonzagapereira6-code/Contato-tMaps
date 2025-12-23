@@ -1,76 +1,39 @@
 
-:root {
-  font-family: 'Courier New', Courier, monospace;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: dark;
-  color: #00ff00; /* Neon Green */
-  background-color: #000000;
-  /* REMOVED text-shadow from root to disable global neon effect */
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Impede barras de rolagem no nível da página */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f0f2f5; /* Um cinza claro, similar ao fundo do WhatsApp */
 }
 
-a {
-  font-weight: 500;
-  color: #ff00ff; /* Neon Magenta */
-  text-decoration: inherit;
-  /* Kept the shadow for links */
-  text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff;
-  transition: color 0.25s, text-shadow 0.25s;
-}
-
-a:hover {
-  color: #ffffff;
-  text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 30px #ff00ff;
-}
-
-body {
-  margin: 0;
+/* Garante que o container principal da sua aplicação também ocupe todo o espaço */
+.App {
+  width: 100%;
+  height: 100%;
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-  color: #00ffff; /* Neon Cyan */
-  /* Kept the shadow for h1 elements */
-  text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
 }
 
-button,
-input {
-  border-radius: 8px;
-  border: 1px solid #00ffff; /* Borda azul clara */
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #00008B; /* Azul escuro */
-  color: #ffffff; /* Texto branco para melhor contraste */
-  cursor: pointer;
-  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s;
-  box-shadow: 0 0 5px #00ffff;
-}
-
-button:hover,
-input:hover {
-  border-color: #ffffff;
-  background-color: #0000CD; /* Azul um pouco mais claro no hover */
-  box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
-}
-
-button:focus,
-button:focus-visible,
-input:focus,
-input:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-  outline-color: #00ffff; /* Neon Cyan for focus outline */
+/* Adicione esta classe ao container da sua página (como em ChatVideoRTC.tsx)
+   para garantir que ele se comporte corretamente dentro do layout flex. */
+.page-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; /* Permite rolagem dentro da página, se necessário */
 }
