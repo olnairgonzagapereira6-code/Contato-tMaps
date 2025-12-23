@@ -1,8 +1,10 @@
 /* Estrutura Geral */
 .chat-page-container {
   display: flex;
-  height: 97vh;
-  width: 97vw;
+  height: 80vh; /* Reduzido de 97vh */
+  width: 80vw; /* Reduzido de 97vw */
+  max-width: 1200px; /* Adicionado para telas grandes */
+  max-height: 900px; /* Adicionado para telas grandes */
   font-family: Arial, sans-serif;
   background-color: #f0f2f5;
   position: absolute;
@@ -12,13 +14,13 @@
   right: 0;
   margin: auto;
   overflow: hidden;
-  border-radius: 10px; /* Adiciona bordas arredondadas para um visual mais suave */
-  box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Adiciona uma sombra sutil */
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 
 /* --- BARRA LATERAL (LISTA DE USUÁRIOS) --- */
 .user-list-sidebar {
-  width: 300px;
+  width: 280px; /* Levemente reduzido */
   border-right: 1px solid #ccc;
   display: flex;
   flex-direction: column;
@@ -34,7 +36,7 @@
 
 .user-list-header {
   padding: 16px;
-  font-size: 1.2em;
+  font-size: 1.1em; /* Reduzido */
   font-weight: bold;
   border-bottom: 1px solid #eee;
   text-align: center;
@@ -48,7 +50,7 @@
 .user-list-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 14px; /* Reduzido */
   cursor: pointer;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -62,8 +64,8 @@
 }
 
 .user-list-item span {
-  margin-left: 12px;
-  font-size: 1em;
+  margin-left: 10px; /* Reduzido */
+  font-size: 0.95em; /* Reduzido */
 }
 
 /* --- ÁREA PRINCIPAL DO CHAT --- */
@@ -90,7 +92,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
+  padding: 8px 16px; /* Reduzido */
   border-bottom: 1px solid #ccc;
   background-color: #f8f9fa;
 }
@@ -101,25 +103,35 @@
 }
 
 .user-details span {
-  margin-left: 15px;
+  margin-left: 12px; /* Reduzido */
   font-weight: bold;
-  font-size: 1.1em;
+  font-size: 1.0em; /* Reduzido */
 }
 
 .chat-header-controls {
   display: flex;
-  gap: 15px;
+  gap: 12px; /* Reduzido */
 }
 
+.contacts-button,
 .video-call-button,
 .delete-conversation-button {
-  padding: 8px 15px;
+  padding: 7px 14px; /* Reduzido */
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 0.9em;
+  font-size: 0.85em; /* Reduzido */
   transition: background-color 0.2s;
 }
+
+.contacts-button {
+    background-color: #6c757d;
+    color: white;
+}
+.contacts-button:hover {
+    background-color: #5a6268;
+}
+
 
 .video-call-button {
   background-color: #28a745;
@@ -148,28 +160,27 @@
 /* --- ÁREA DAS MENSAGENS --- */
 .message-area {
   flex-grow: 1;
-  padding: 20px;
+  padding: 16px; /* Reduzido */
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Aumenta o espaço entre as mensagens */
+  gap: 12px; /* Reduzido */
 }
 
-/* Este wrapper é o container de cada bolha de mensagem + botões */
 .message-wrapper {
-  position: relative; /* Essencial para o posicionamento do botão de cópia */
+  position: relative;
   display: flex;
   align-items: center;
-  max-width: 70%;
-  /* O clique é tratado no JS, mas um cursor pointer indica interatividade */
+  max-width: 65%; /* Reduzido */
   cursor: pointer; 
 }
 
 .message {
-  padding: 10px 15px;
-  border-radius: 18px;
+  padding: 8px 12px; /* Reduzido */
+  border-radius: 16px; /* Reduzido */
   word-wrap: break-word;
   max-width: 100%;
+  font-size: 0.95em; /* Reduzido */
 }
 
 .message p {
@@ -188,7 +199,7 @@
 
 .outgoing-wrapper {
   align-self: flex-end;
-  flex-direction: row-reverse; /* Botão de apagar à esquerda, mensagem à direita */
+  flex-direction: row-reverse;
 }
 
 .outgoing {
@@ -198,22 +209,20 @@
 }
 
 
-/* --- Botões de Ação da Mensagem (Apagar e Copiar) --- */
+/* --- Botões de Ação da Mensagem --- */
 
 .delete-message-button {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.2em;
+  font-size: 1.1em; /* Reduzido */
   color: #888;
   opacity: 0;
   transition: opacity 0.2s ease, color 0.2s ease;
-  padding: 0 10px;
-  /* Garante que o botão não mude o layout */
+  padding: 0 8px; /* Reduzido */
   flex-shrink: 0;
 }
 
-/* Mostra o botão de apagar ao passar o mouse sobre o wrapper da mensagem de saída */
 .outgoing-wrapper:hover .delete-message-button {
   opacity: 1; 
 }
@@ -222,20 +231,17 @@
   color: #dc3545;
 }
 
-/* Botão de Copiar/Compartilhar */
 .copy-message-button {
   position: absolute;
-  /* Posiciona o botão acima e centralizado em relação ao .message-wrapper */
-  top: -22px; 
+  top: -20px; 
   left: 50%;
   transform: translateX(-50%);
-  
   background-color: rgba(0, 0, 0, 0.6);
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 3px 10px;
-  font-size: 1.1em; /* Emoji um pouco maior */
+  border-radius: 6px; /* Reduzido */
+  padding: 2px 8px; /* Reduzido */
+  font-size: 1.0em; /* Reduzido */
   cursor: pointer;
   z-index: 10;
   opacity: 0.9;
@@ -252,7 +258,7 @@
 /* --- INPUT DE MENSAGEM --- */
 .message-input {
   display: flex;
-  padding: 10px 20px;
+  padding: 8px 16px; /* Reduzido */
   border-top: 1px solid #ccc;
   background-color: #f8f9fa;
 }
@@ -260,22 +266,22 @@
 .message-input form {
   display: flex;
   width: 100%;
-  gap: 10px;
+  gap: 8px; /* Reduzido */
 }
 
 .message-input input {
   flex-grow: 1;
-  padding: 10px;
+  padding: 9px 15px; /* Reduzido */
   border: 1px solid #ddd;
-  border-radius: 20px;
+  border-radius: 18px; /* Reduzido */
 }
 
 .message-input button {
-  padding: 10px 20px;
+  padding: 9px 18px; /* Reduzido */
   border: none;
   background-color: #007bff;
   color: white;
-  border-radius: 20px;
+  border-radius: 18px; /* Reduzido */
   cursor: pointer;
 }
 
@@ -288,13 +294,40 @@
   cursor: not-allowed;
 }
 
+.mic-button {
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.mic-button.recording {
+    background-color: #dc3545;
+}
+
 /* --- Placeholder (Sem conversa selecionada) --- */
 .chat-placeholder {
   display: flex;
+  flex-direction: column; /* Para alinhar o botão abaixo do texto */
   justify-content: center;
   align-items: center;
   height: 100%;
   color: #777;
+  text-align: center;
+}
+
+.select-contact-button {
+    margin-top: 20px;
+    padding: 12px 25px;
+    font-size: 1em;
+    color: white;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.select-contact-button:hover {
+    background-color: #0056b3;
 }
 
 /* --- MODAL DE CHAMADA RECEBIDA --- */
@@ -389,7 +422,6 @@
   background: #333;
 }
 
-/* Botão de Saída X */
 .exit-button {
   position: absolute;
   top: 20px;
@@ -406,7 +438,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1010; /* Garante que fique sobre os vídeos */
+  z-index: 1010;
   transition: background-color 0.2s;
 }
 
@@ -415,7 +447,6 @@
 }
 
 
-/* Controles da chamada (ex: encerrar) */
 .call-controls {
   position: absolute;
   bottom: 30px;
@@ -442,7 +473,7 @@
 }
 
 .end-call-button {
-  background-color: #dc3545; /* Vermelho */
+  background-color: #dc3545;
 }
 
 .end-call-button:hover {
@@ -451,29 +482,37 @@
 
 /* --- ESTILOS RESPONSIVOS PARA CELULAR --- */
 @media (max-width: 768px) {
-  .user-list-sidebar,
-  .chat-area-content:not(.hidden) + .user-list-sidebar {
-    width: 100%;
-    position: absolute;
-    left: -100%;
-    transition: left 0.3s ease;
+  .chat-page-container {
+      height: 100vh; /* Ocupa a tela inteira */
+      width: 100vw;
+      border-radius: 0;
   }
 
-  .user-list-sidebar.active {
-    left: 0;
-    z-index: 100; 
+  .user-list-sidebar {
+    display: none; /* Esconde a lista de contatos por padrão */
   }
 
   .chat-area-content {
     width: 100%;
   }
+  
+  /* Quando não há usuário selecionado, mostramos a lista em vez do placeholder */
+  .chat-placeholder {
+      display: none; /* Esconde o placeholder */
+  }
+  
+  .chat-area-content:not(.hidden) + .user-list-sidebar {
+      display: flex; /* Esta regra pode precisar de ajuste dependendo da estrutura */
+      width: 100%;
+      left: 0;
+      z-index: 100;
+  }
 
-  /* Ajustes na tela de vídeo */
   .local-video {
-    width: 120px;   /* Menor */
-    height: 90px;
+    width: 100px;
+    height: 75px;
     right: 10px;
-    bottom: 80px; /* Acima dos controles */
+    bottom: 80px;
   }
 
   .call-controls {
@@ -483,19 +522,14 @@
   .control-button {
     width: 50px;
     height: 50px;
-    font-size: 1em;
   }
 
   .exit-button {
     top: 15px;
     left: 15px;
-    width: 35px;
-    height: 35px;
-    font-size: 1.2em;
   }
 
-  /* Ajustes no chat */
   .message-wrapper {
-    max-width: 90%;
+    max-width: 85%;
   }
 }

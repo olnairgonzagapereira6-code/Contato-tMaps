@@ -5,7 +5,7 @@ import { Session, RealtimeChannel, User } from '@supabase/supabase-js';
 import Avatar from '../Avatar';
 import NotificationBell from '../components/NotificationBell';
 import './ChatVideoRTC.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Efeito para registrar o Service Worker uma vez
 if ('serviceWorker' in navigator) {
@@ -30,11 +30,12 @@ interface Profile extends User {
 function ChatVideoRTC() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<Profile[]>([]);
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const navigate = useNavigate();
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
   // --- Novos estados para gravação de áudio ---
@@ -71,22 +72,24 @@ function ChatVideoRTC() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
         setSession(data.session);
-        if (data.session) fetchUsers(data.session);
     }).finally(() => setLoading(false));
 
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
         if (!session) {
-            setUsers([]);
             setSelectedUser(null);
             cleanupCall();
-        } else {
-            fetchUsers(session);
         }
     });
 
     return () => authSub.unsubscribe();
   }, []);
+
+  useEffect(() => {
+      if (location.state?.selectedUser) {
+          setSelectedUser(location.state.selectedUser);
+      }
+  }, [location.state]);
 
   useEffect(() => {
     if (selectedUser && session) {
@@ -139,9 +142,11 @@ function ChatVideoRTC() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: `receiver_id=eq.${session.user.id}` }, 
       (payload) => {
         if (!payload.new.end_time && !callState.inCall) {
-          const caller = users.find(u => u.id === payload.new.created_by);
-          console.log("Chamada recebida detectada:", payload.new);
-          setCallState(prev => ({ ...prev, incomingCall: { ...payload.new, caller } }));
+          // Precisamos buscar o perfil do chamador
+          supabase.from('profiles').select('id, username, avatar_url').eq('id', payload.new.created_by).single().then(({ data: caller }) => {
+            console.log("Chamada recebida detectada:", payload.new);
+            setCallState(prev => ({ ...prev, incomingCall: { ...payload.new, caller } }));
+          });
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls' }, 
@@ -157,19 +162,10 @@ function ChatVideoRTC() {
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(callChannel);
     };
-  }, [session?.user?.id, users, selectedUser, callState.inCall, callState.callId]);
+  }, [session?.user?.id, selectedUser, callState.inCall, callState.callId]);
 
 
   // --- FUNÇÕES DE DADOS ---
-
-  const fetchUsers = async (currentSession: Session) => {
-    const { data, error } = await supabase.from('profiles').select('id, username, avatar_url');
-    if (error) {
-      console.error("Erro ao buscar usuários:", error);
-    } else {
-      setUsers(data.filter(u => u.id !== currentSession.user.id) as Profile[]);
-    }
-  };
 
   const fetchMessages = async (userId: string, peerId: string) => {
     const { data, error } = await supabase
@@ -497,8 +493,10 @@ function ChatVideoRTC() {
     console.log("--- ACEITANDO CHAMADA ---");
     if (!session || !callState.incomingCall) return;
     
-    const callerProfile = users.find(u => u.id === callState.incomingCall.created_by);
-    if (callerProfile) setSelectedUser(callerProfile);
+    // Define o usuário selecionado como o chamador
+    if (callState.incomingCall.caller) {
+        setSelectedUser(callState.incomingCall.caller);
+    }
     
     setCallState(prev => ({ ...prev, isJoining: true }));
     console.log("1. Estado 'isJoining' definido como true.");
@@ -604,22 +602,6 @@ function ChatVideoRTC() {
         </div>
       )}
 
-      <aside className={`user-list-sidebar ${callState.inCall ? 'hidden' : ''}`}>
-        <h1>CONTATOS</h1>
-        <div className="user-list">
-          {users.map(user => (
-            <div 
-              key={user.id} 
-              className={`user-list-item ${selectedUser?.id === user.id ? 'selected' : ''}`}
-              onClick={() => setSelectedUser(user)}
-            >
-              <Avatar url={user.avatar_url} size={40} readOnly />
-              <span>{user.username || 'Usuário sem nome'}</span>
-            </div>
-          ))}
-        </div>
-      </aside>
-
       <main className={`chat-area-content ${callState.inCall ? 'hidden' : ''}`}>
         {selectedUser ? (
           <div className="main-chat">
@@ -629,6 +611,12 @@ function ChatVideoRTC() {
                 <span>{selectedUser.username}</span>
               </div>
               <div className="chat-header-controls">
+                 <button 
+                    onClick={() => navigate('/contacts')}
+                    className="contacts-button"
+                 >
+                   Contatos
+                 </button>
                  <button 
                     onClick={handleCreateCall} 
                     className="video-call-button" 
@@ -673,7 +661,7 @@ function ChatVideoRTC() {
                     </button>
                   )}
                 </div>
-              ))}
+              ))}`
               <div ref={messagesEndRef} />
             </main>
 
@@ -699,7 +687,10 @@ function ChatVideoRTC() {
           </div>
         ) : (
           <div className="chat-placeholder">
-            <h2>Selecione um usuário para começar a conversar</h2>
+            <h2>Selecione um contato para começar a conversar</h2>
+            <button onClick={() => navigate('/contacts')} className="select-contact-button">
+                Ver Contatos
+            </button>
           </div>
         )}
       </main>
