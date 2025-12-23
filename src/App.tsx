@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Auth from './Auth'
 import Account from './pages/Account' 
-import ChatVideoRTC from './pages/ChatVideoRTC'
-import Contacts from './pages/Contacts'
+import ChatPage from './pages/ChatPage' // Importa a nova página de Chat
 import { Session } from '@supabase/supabase-js'
 import './App.css'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -35,9 +34,10 @@ function App() {
     <BrowserRouter>
       <div className="App">
         <Routes>
-            <Route path="/chat" element={session ? <ChatVideoRTC /> : <Auth />} />
-            <Route path="/contacts" element={session ? <Contacts /> : <Auth />} />
-            <Route path="/" element={!session ? <Auth /> : <Account key={session.user.id} session={session} />} />
+            {/* A rota principal agora renderiza a ChatPage se o usuário estiver logado */}
+            <Route path="/" element={!session ? <Auth /> : <ChatPage />} />
+            {/* A rota de conta ainda pode ser acessada se necessário */}
+            <Route path="/account" element={!session ? <Auth /> : <Account key={session.user.id} session={session} />} />
         </Routes>
       </div>
     </BrowserRouter>

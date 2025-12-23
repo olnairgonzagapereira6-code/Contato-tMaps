@@ -1,0 +1,144 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, sans-serif; background: #d1d7db; }
+
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+/* CONTATOS */
+.contacts-panel {
+  width: 25%;
+  background: #ffffff;
+  border-right: 1px solid #ddd;
+}
+.contacts-header {
+  background: #075E54;
+  color: white;
+  padding: 12px;
+  font-weight: bold;
+}
+.contacts-list { list-style: none; padding: 0; margin: 0; }
+.contact {
+  padding: 12px;
+  cursor: pointer;
+}
+.contact:hover,
+.contact.active {
+  background: #ECE5DD;
+}
+
+/* CHAT */
+.chat-panel {
+  width: 45%;
+  display: flex;
+  flex-direction: column;
+  background: #ECE5DD;
+}
+.chat-header {
+  background: #075E54;
+  color: white;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.chat-actions .btn { margin-left: 6px; }
+
+.chat-messages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+.msg {
+  max-width: 70%;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+}
+.received { background: #fff; }
+.sent {
+  background: #DCF8C6;
+  margin-left: auto;
+}
+
+.chat-input {
+  display: flex;
+  padding: 8px;
+  background: #f0f0f0;
+}
+.chat-input input {
+  flex: 1;
+  border-radius: 20px;
+  border: none;
+  padding: 8px;
+  margin: 0 6px;
+}
+
+/* VIDEO */
+.video-panel {
+  width: 30%;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+.video-header {
+  background: #075E54;
+  color: white;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.video-area {
+  flex: 1;
+  position: relative;
+}
+.video {
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.remote {
+  width: 100%;
+  height: 100%;
+}
+.local {
+  position: absolute;
+  bottom: 90px;
+  right: 12px;
+  width: 110px;
+  height: 150px;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  background: #111;
+}
+
+.video-controls {
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* BOTÕES */
+.btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+}
+.btn.exit { background: #EA4335; color: white; padding: 4px 10px; border-radius: 4px; }
+.btn.send { color: #25D366; font-weight: bold; }
+
+.vbtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  font-size: 20px;
+  color: white;
+  cursor: pointer;
+}
+.vbtn.mic, .vbtn.cam { background: #2a2a2a; }
+.vbtn.call { background: #25D366; }
+.vbtn.end { background: #EA4335; }
