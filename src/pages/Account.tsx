@@ -58,7 +58,11 @@ export default function Account({ session }: { session: Session }) {
     };
   }, [session]);
 
-  async function updateProfile(event: React.FormEvent<HTMLFormElement> | null) {
+  // Modificado para aceitar uma nova URL de avatar diretamente
+  async function updateProfile(
+    event: React.FormEvent<HTMLFormElement> | null,
+    newAvatarUrl?: string
+  ) {
     if (event) {
       event.preventDefault();
     }
@@ -70,24 +74,20 @@ export default function Account({ session }: { session: Session }) {
       id: user.id,
       username,
       website,
-      avatar_url,
+      // Usa a nova URL se fornecida, senão, mantém a antiga.
+      avatar_url: newAvatarUrl !== undefined ? newAvatarUrl : avatar_url,
       updated_at: new Date(),
     };
 
     const { error } = await supabase.from("profiles").upsert(updates);
 
     if (error) {
-      alert("Error updating the data!");
+      alert("Erro ao atualizar os dados!");
       console.log(error);
     } else {
-      // alert("Profile updated successfully!");
-      const { data: usersData, error: usersError } = await supabase
-        .from("profiles")
-        .select(`username, website, avatar_url`);
-      if (usersError) {
-        console.warn(usersError);
-      } else if (usersData) {
-        setUsers(usersData);
+      // Atualiza o estado local da URL do avatar se uma nova foi salva.
+      if (newAvatarUrl !== undefined) {
+        setAvatarUrl(newAvatarUrl);
       }
     }
     setLoading(false);
@@ -134,7 +134,7 @@ export default function Account({ session }: { session: Session }) {
   };
 
   return (
-    <div>
+    <div className="account-container">
       <div className="account-header">
         <h1 className="header">Sua Conta</h1>
         <div className="menu-buttons">
@@ -159,8 +159,8 @@ export default function Account({ session }: { session: Session }) {
               </div>
             )}
           </div>
-          <Link to="/chat" className="button primary">
-            Entrar
+          <Link to="/chat" className="button">
+            Entrar no Chat
           </Link>
           <button
             className="button button-logout"
@@ -171,58 +171,61 @@ export default function Account({ session }: { session: Session }) {
           </button>
         </div>
       </div>
-      <form onSubmit={updateProfile} className="form-widget">
-        <Avatar
-          url={avatar_url}
-          size={150}
-          onUpload={(url) => {
-            setAvatarUrl(url);
-            updateProfile(null);
-          }}
-        />
-        <div>
-          <label htmlFor="email">Email</label>
-          <input id="email" type="text" value={session.user.email} disabled />
-        </div>
-        <div>
-          <label htmlFor="username">Name</label>
-          <input
-            id="username"
-            type="text"
-            value={username || ""}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="website">Website</label>
-          <input
-            id="website"
-            type="url"
-            value={website || ""}
-            onChange={(e) => setWebsite(e.target.value)}
-          />
-        </div>
 
-        <div>
-          <button
-            className="button block primary"
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? "Carregando ..." : "Atualizar Perfil"}
-          </button>
-        </div>
-      </form>
+      <div className="account-content">
+        <form onSubmit={updateProfile} className="form-widget">
+          <Avatar
+            url={avatar_url}
+            size={150}
+            onUpload={(url) => {
+              // Passa a nova URL diretamente para a função de atualização
+              updateProfile(null, url);
+            }}
+          />
+          <div>
+            <label htmlFor="email">Email</label>
+            <input id="email" type="text" value={session.user.email} disabled />
+          </div>
+          <div>
+            <label htmlFor="username">Nome</label>
+            <input
+              id="username"
+              type="text"
+              value={username || ""}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              type="url"
+              value={website || ""}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </div>
 
-      <div id="contacts-list" className="user-list-section">
-        <h2 className="header">Todos os Usuários</h2>
-        <div className="user-list">
-          {users.map((user, index) => (
-            <div key={index} className="user-list-item">
-              <Avatar url={user.avatar_url} size={50} readOnly={true} />
-              <span>{user.username || "Unnamed"}</span>
-            </div>
-          ))}
+          <div>
+            <button
+              className="button block primary"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? "Carregando..." : "Atualizar Perfil"}
+            </button>
+          </div>
+        </form>
+
+        <div id="contacts-list" className="user-list-section">
+          <h2 className="header">Contatos</h2>
+          <div className="user-list">
+            {users.map((user, index) => (
+              <div key={index} className="user-list-item">
+                <Avatar url={user.avatar_url} size={50} readOnly={true} />
+                <span>{user.username || "Unnamed"}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

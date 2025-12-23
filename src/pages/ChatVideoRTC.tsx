@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Session, RealtimeChannel, User } from '@supabase/supabase-js';
 import Avatar from '../Avatar';
 import NotificationBell from '../components/NotificationBell';
+import AudioPlayer from '../components/AudioPlayer'; // Importando o novo componente
 import './ChatVideoRTC.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -518,7 +519,7 @@ function ChatVideoRTC() {
                       )}
                       
                       {msg.is_audio ? (
-                        <audio controls src={msg.content} style={{maxWidth: '100%'}}></audio>
+                        <AudioPlayer audioUrl={msg.content} /> // Usando o novo componente
                       ) : (
                         <p className="message-content">{msg.content}</p>
                       )}

@@ -1,27 +1,176 @@
-
-.account-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
+/* === Estrutura Principal (Inspirado no WhatsApp) === */
+.account-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Garante que o fundo ocupe a tela toda */
+    background-color: #E5DDD5; /* Fundo padrão do WhatsApp */
+    background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); /* Padrão de fundo sutil */
 }
 
+/* === Cabeçalho (Barra Verde) === */
+.account-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background-color: #075E54; /* Verde escuro do WhatsApp */
+    color: white;
+    flex-shrink: 0; /* Impede que o cabeçalho encolha */
+}
+
+.account-header .header {
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin: 0; /* Remove margens padrão do h1 */
+}
+
+/* === Botões no Cabeçalho === */
+.menu-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Espaçamento entre os botões */
+}
+
+.menu-buttons .button,
+.menu-buttons .button-logout {
+    background-color: #25D366; /* Verde claro do WhatsApp para botões */
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none; /* Para o Link do React Router */
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-buttons .button-logout {
+    background-color: #FF5C5C; /* Cor para o botão de sair */
+}
+
+.menu-buttons .button:hover,
+.menu-buttons .button-logout:hover {
+    opacity: 0.9;
+}
+
+/* === Conteúdo Central (Formulário e Lista) === */
+.account-content {
+    flex-grow: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centraliza o conteúdo */
+    gap: 30px; /* Espaço entre o formulário e a lista */
+}
+
+
+/* === Formulário de Perfil === */
+.form-widget {
+    background-color: rgba(255, 255, 255, 0.9); /* Fundo branco semi-transparente */
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px; /* Largura máxima para o formulário */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centraliza itens do formulário como o Avatar */
+    gap: 15px; /* Espaço entre os elementos do formulário */
+}
+
+.form-widget div {
+    width: 100%;
+}
+
+.form-widget label {
+    font-weight: 500;
+    color: #333;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.form-widget input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Garante que o padding não aumente a largura */
+}
+
+.form-widget .button.primary {
+    background-color: #075E54; /* Verde do WhatsApp */
+}
+
+/* === Lista de Usuários === */
+.user-list-section {
+    background-color: rgba(255, 255, 255, 0.9); /* Fundo branco semi-transparente */
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px; /* Mesma largura do formulário */
+}
+
+.user-list-section .header {
+    text-align: center;
+    color: #075E54;
+    margin-bottom: 15px;
+}
+
+.user-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.user-list-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.user-list-item:last-child {
+    border-bottom: none;
+}
+
+.user-list-item span {
+    font-weight: 500;
+}
+
+
+/* === Dropdown Menu === */
 .dropdown-container {
   position: relative;
 }
 
 .dropdown-menu {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 5px); /* Um pouco abaixo do botão */
   right: 0;
   border: 1px solid #ccc;
   border-radius: 4px;
   background-color: white;
   z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  overflow: hidden; /* Garante que os botões fiquem dentro das bordas arredondadas */
 }
 
 .dropdown-menu button {
   display: block;
   width: 100%;
   text-align: left;
+  padding: 10px 15px;
+  background: none;
+  border: none;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.dropdown-menu button:hover {
+  background-color: #f2f2f2; /* Cinza claro ao passar o mouse */
 }
