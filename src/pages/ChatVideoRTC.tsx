@@ -35,6 +35,7 @@ function ChatVideoRTC() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const navigate = useNavigate();
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
   // --- Novos estados para gravação de áudio ---
   const [isRecording, setIsRecording] = useState(false);
@@ -198,6 +199,34 @@ function ChatVideoRTC() {
     if (error) {
         alert("Não foi possível enviar a mensagem.");
         console.error("Erro ao enviar mensagem:", error);
+    }
+  };
+
+  const handleCopyMessage = async (message: any) => {
+    try {
+      if (message.is_audio) {
+        // Tenta usar a API de compartilhamento para áudios (melhor para mobile)
+        if (navigator.share) {
+          await navigator.share({
+            title: 'Áudio compartilhado',
+            text: `Mensagem de áudio de ${message.sender.username}`,
+            url: message.content,
+          });
+        } else {
+          // Fallback para copiar o link se a API de compartilhamento não estiver disponível
+          await navigator.clipboard.writeText(message.content);
+          alert('Link do áudio copiado para a área de transferência!');
+        }
+      } else {
+        // Copia o texto da mensagem
+        await navigator.clipboard.writeText(message.content);
+        alert('Mensagem copiada!');
+      }
+    } catch (error) {
+      console.error("Falha ao copiar/compartilhar:", error);
+      alert("Não foi possível copiar ou compartilhar o conteúdo.");
+    } finally {
+        setSelectedMessageId(null); // Esconde o botão após a ação
     }
   };
 
@@ -541,11 +570,6 @@ function ChatVideoRTC() {
   if (loading) return <div>Carregando...</div>;
   if (!session) return <div>Você precisa estar logado para usar o chat.</div>
 
-  // Função para verificar se o conteúdo é uma URL de áudio
-  const isAudioMessage = (content: string) => {
-    return content.startsWith('http') && (content.endsWith('.webm') || content.endsWith('.mp3') || content.endsWith('.ogg'));
-  };
-
   return (
     <div className="chat-page-container">
       <NotificationBell />
@@ -618,9 +642,24 @@ function ChatVideoRTC() {
               </div>
             </header>
 
-            <main className="message-area">
+            <main className="message-area" onClick={() => setSelectedMessageId(null)}>
               {messages.map(msg => (
-                <div key={msg.id} className={`message-wrapper ${msg.sender_id === session.user.id ? 'outgoing-wrapper' : 'incoming-wrapper'}`}>
+                <div 
+                  key={msg.id} 
+                  className={`message-wrapper ${msg.sender_id === session.user.id ? 'outgoing-wrapper' : 'incoming-wrapper'}`}
+                  onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMessageId(selectedMessageId === msg.id ? null : msg.id);
+                  }}
+                >
+                  {selectedMessageId === msg.id && (
+                    <button 
+                      className="copy-message-button"
+                      onClick={() => handleCopyMessage(msg)}
+                    >
+                      📄
+                    </button>
+                  )}
                   <div className={`message ${msg.sender_id === session.user.id ? 'outgoing' : 'incoming'}`}>
                     {msg.is_audio ? (
                       <audio controls src={msg.content}></audio>
