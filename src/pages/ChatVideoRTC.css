@@ -1,12 +1,19 @@
 /* Estrutura Geral */
 .chat-page-container {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: 97vh;
+  width: 97vw;
   font-family: Arial, sans-serif;
   background-color: #f0f2f5;
-  position: relative;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
   overflow: hidden;
+  border-radius: 10px; /* Adiciona bordas arredondadas para um visual mais suave */
+  box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Adiciona uma sombra sutil */
 }
 
 /* --- BARRA LATERAL (LISTA DE USUÁRIOS) --- */
