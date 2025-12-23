@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Session, RealtimeChannel, User } from '@supabase/supabase-js';
 import Avatar from '../Avatar';
-import NotificationBell from '../components/NotificationBell'; // Importa o sino
+import NotificationBell from '../components/NotificationBell';
 import './ChatVideoRTC.css';
 import { useNavigate } from 'react-router-dom';
 
@@ -91,17 +91,23 @@ function ChatVideoRTC() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
+    const handleNewMessage = (payload: any) => {
+      const isForMe = payload.new.receiver_id === session.user.id && payload.new.sender_id === selectedUser?.id;
+      const isFromMe = payload.new.sender_id === session.user.id && payload.new.receiver_id === selectedUser?.id;
+
+      if (selectedUser && (isForMe || isFromMe)) {
+          setMessages(currentMessages => [...currentMessages, payload.new]);
+      }
+    };
+
+    const handleDeletedMessage = (payload: any) => {
+      setMessages(currentMessages => currentMessages.filter(msg => msg.id !== payload.old.id));
+    };
+
     const messageChannel = supabase
       .channel('public:messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, 
-      (payload) => {
-        const isForMe = payload.new.receiver_id === session.user.id && payload.new.sender_id === selectedUser?.id;
-        const isFromMe = payload.new.sender_id === session.user.id && payload.new.receiver_id === selectedUser?.id;
-
-        if (selectedUser && (isForMe || isFromMe)) {
-            setMessages(currentMessages => [...currentMessages, payload.new]);
-        }
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, handleNewMessage)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, handleDeletedMessage)
       .subscribe();
 
     const callChannel = supabase
@@ -171,6 +177,35 @@ function ChatVideoRTC() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    if (error) {
+      alert("Não foi possível apagar a mensagem.");
+      console.error("Erro ao apagar mensagem:", error);
+    }
+    // A remoção da UI é tratada pelo listener de 'DELETE'
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!session || !selectedUser) return;
+
+    const userConfirmation = window.confirm("Tem certeza de que deseja excluir esta conversa? Suas mensagens serão removidas permanentemente.");
+    
+    if (userConfirmation) {
+      // Pega os IDs de todas as mensagens na conversa atual
+      const messageIds = messages.map(msg => msg.id);
+
+      if (messageIds.length > 0) {
+        // Tenta apagar todas (RLS garantirá que apenas as do próprio usuário sejam apagadas)
+        await supabase.from('messages').delete().in('id', messageIds);
+      }
+      
+      // Limpa a UI imediatamente
+      setMessages([]);
+    }
+  };
+
+
   // --- FUNÇÕES DE CHAMADA (WebRTC) ---
 
   const cleanupCall = useCallback(() => {
@@ -210,7 +245,6 @@ function ChatVideoRTC() {
 
     if (isCaller) {
       rtcCh.on('broadcast', { event: 'answer' }, async ({ payload }) => {
-        // Await a resposta para evitar race conditions
         if (payload && pc.signalingState !== 'stable') {
           await pc.setRemoteDescription(new RTCSessionDescription(payload));
         }
@@ -223,7 +257,7 @@ function ChatVideoRTC() {
           rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
         }
       });
-    } else { // É quem recebe a chamada
+    } else {
       rtcCh.on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload) {
             await pc.setRemoteDescription(new RTCSessionDescription(payload));
@@ -379,7 +413,7 @@ function ChatVideoRTC() {
         </div>
       )}
 
-      <aside className={`user-list-sidebar ${callState.inCall ? 'hidden' : ''}`}>
+      <aside className={`user-list-sidebar ${callState.inCall ? 'hidden' : ''}`}>\
         <header className="user-list-header">Contatos</header>
         <div className="user-list">
           {users.map(user => (
@@ -395,7 +429,7 @@ function ChatVideoRTC() {
         </div>
       </aside>
 
-      <main className={`chat-area-content ${callState.inCall ? 'hidden' : ''}`}>
+      <main className={`chat-area-content ${callState.inCall ? 'hidden' : ''}`}>\
         {selectedUser ? (
           <div className="main-chat">
             <header className="chat-header">
@@ -403,7 +437,7 @@ function ChatVideoRTC() {
                 <Avatar url={selectedUser.avatar_url} size={40} readOnly />
                 <span>{selectedUser.username}</span>
               </div>
-              <div className="video-call-controls">
+              <div className="chat-header-controls">
                  <button 
                     onClick={handleCreateCall} 
                     className="video-call-button" 
@@ -411,13 +445,23 @@ function ChatVideoRTC() {
                   >
                     {callState.isJoining ? 'Iniciando...' : 'Ligar'}
                   </button>
+                  <button onClick={handleDeleteConversation} className="delete-conversation-button" aria-label="Excluir conversa">
+                    Excluir Conversa
+                  </button>
               </div>
             </header>
 
             <main className="message-area">
               {messages.map(msg => (
-                <div key={msg.id} className={`message ${msg.sender_id === session.user.id ? 'outgoing' : 'incoming'}`}>
-                  <p>{msg.content}</p>
+                <div key={msg.id} className={`message-wrapper ${msg.sender_id === session.user.id ? 'outgoing-wrapper' : 'incoming-wrapper'}`}>
+                  <div className={`message ${msg.sender_id === session.user.id ? 'outgoing' : 'incoming'}`}>
+                    <p>{msg.content}</p>
+                  </div>
+                  {msg.sender_id === session.user.id && (
+                    <button onClick={() => handleDeleteMessage(msg.id)} className="delete-message-button" aria-label="Apagar mensagem">
+                      🗑️
+                    </button>
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -440,7 +484,7 @@ function ChatVideoRTC() {
           <div className="chat-placeholder">
             <h2>Selecione um usuário para começar a conversar</h2>
           </div>
-        )}
+        )}\
       </main>
     </div>
   );
