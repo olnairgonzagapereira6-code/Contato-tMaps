@@ -5,6 +5,7 @@ import { Session, RealtimeChannel, User } from '@supabase/supabase-js';
 import Avatar from '../Avatar';
 import NotificationBell from '../components/NotificationBell'; // Importa o sino
 import './ChatVideoRTC.css';
+import { useNavigate } from 'react-router-dom';
 
 // Efeito para registrar o Service Worker uma vez
 if ('serviceWorker' in navigator) {
@@ -33,6 +34,7 @@ function ChatVideoRTC() {
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const navigate = useNavigate();
 
   const [callState, setCallState] = useState<{
     inCall: boolean;
@@ -337,6 +339,11 @@ function ChatVideoRTC() {
     }
   }, [callState.callId, cleanupCall, session]);
 
+  const handleExit = () => {
+    handleEndCall();
+    navigate('/');
+  };
+
   // --- RENDERIZAÇÃO ---
 
   if (loading) return <div>Carregando...</div>;
@@ -361,6 +368,7 @@ function ChatVideoRTC() {
 
       {callState.inCall && (
         <div className="video-container">
+          <button onClick={handleExit} className="exit-button">X</button>
           <div className="video-main">
             <video ref={remoteVideoRef} className="remote-video" autoPlay playsInline ></video>
             <video ref={localVideoRef} className="local-video" autoPlay playsInline muted></video>
