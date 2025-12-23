@@ -47,6 +47,8 @@ function ChatVideoRTC() {
     callId: null,
     incomingCall: null,
   });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -54,6 +56,8 @@ function ChatVideoRTC() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const rtcChannelRef = useRef<RealtimeChannel | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+
 
   // --- EFEITOS (Lifecycle) ---
 
@@ -86,6 +90,19 @@ function ChatVideoRTC() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Efeito para monitorar o estado da tela cheia
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   // --- Otimização de Subscrições ---
   useEffect(() => {
@@ -204,6 +221,16 @@ function ChatVideoRTC() {
 
 
   // --- FUNÇÕES DE CHAMADA (WebRTC) ---
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+        videoContainerRef.current?.requestFullscreen().catch(err => {
+            console.error(`Erro ao tentar ativar o modo de tela cheia: ${err.message} (${err.name})`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+  }, []);
 
   const cleanupCall = useCallback(() => {
     console.log("Limpando recursos da chamada...");
@@ -401,6 +428,10 @@ function ChatVideoRTC() {
   const handleEndCall = useCallback(async () => {
     console.log("--- ENCERRANDO CHAMADA ---");
     const callIdToUpdate = callState.callId;
+
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
     
     if (callIdToUpdate && session) {
         await supabase.from('call_participants')
@@ -443,12 +474,16 @@ function ChatVideoRTC() {
       )}
 
       {callState.inCall && (
-        <div className="video-container">
+        <div className="video-container" ref={videoContainerRef}>
           <button onClick={handleExit} className="exit-button">X</button>
           <div className="video-main">
             <video ref={remoteVideoRef} className="remote-video" autoPlay playsInline ></video>
             <video ref={localVideoRef} className="local-video" autoPlay playsInline muted></video>
             <div className="call-controls">
+              <button onClick={toggleFullscreen} className="control-button" aria-label={isFullscreen ? "Sair da Tela Cheia" : "Entrar em Tela Cheia"}>
+                {/* Ícone ou texto para tela cheia */}
+                <svg fill="white" viewBox="0 0 20 20" width="24" height="24"><path d="M15 5h2v2h-2V5zM3 7h2V5H3v2zm14-4h-2v2h2V3zM5 3H3v2h2V3zm12 12h2v-2h-2v2zm-4 4h-2v-2h2v2zM3 15h2v-2H3v2zm14-4h-2v2h2v-2zM5 17H3v-2h2v2zm-2-6H1v2h2v-2zm16 0h-2v2h2v-2z"/></svg>
+              </button>
               <button onClick={handleEndCall} className="control-button end-call-button" aria-label="Encerrar chamada">Encerrar</button>
             </div>
           </div>
