@@ -18,8 +18,20 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Configuração de servidores STUN/TURN aprimorada
 const peerConnectionConfig = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.services.mozilla.com' },
+    // Adicionando um servidor TURN público como fallback
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+  ],
 };
 
 interface Profile extends User {
@@ -38,11 +50,9 @@ function ChatVideoRTC() {
   const [newMessage, setNewMessage] = useState('');
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
-  // --- Novos estados para gravação de áudio ---
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
 
   const [callState, setCallState] = useState<{
     inCall: boolean;
@@ -57,7 +67,6 @@ function ChatVideoRTC() {
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -66,8 +75,24 @@ function ChatVideoRTC() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
-
   // --- EFEITOS (Lifecycle) ---
+
+  const cleanupCall = useCallback(() => {
+    console.log("Limpando recursos da chamada...");
+    if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
+    if (peerConnectionRef.current) peerConnectionRef.current.close();
+    if (rtcChannelRef.current) supabase.removeChannel(rtcChannelRef.current).catch(() => {});
+    
+    localStreamRef.current = null;
+    peerConnectionRef.current = null;
+    rtcChannelRef.current = null;
+    
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+
+    setCallState({ inCall: false, isJoining: false, callId: null, incomingCall: null });
+    console.log("Limpeza concluída. Estado da chamada resetado.");
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -83,13 +108,24 @@ function ChatVideoRTC() {
     });
 
     return () => authSub.unsubscribe();
-  }, []);
+  }, [cleanupCall]);
 
   useEffect(() => {
       if (location.state?.selectedUser) {
           setSelectedUser(location.state.selectedUser);
       }
   }, [location.state]);
+
+  const fetchMessages = async (userId: string, peerId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, sender:sender_id(username, avatar_url)')
+      .or(`(sender_id.eq.${userId},receiver_id.eq.${peerId}),(sender_id.eq.${peerId},receiver_id.eq.${userId})`)
+      .order('created_at', { ascending: true });
+
+    if (error) console.error("Erro ao buscar mensagens:", error);
+    else setMessages(data || []);
+  };
 
   useEffect(() => {
     if (selectedUser && session) {
@@ -101,20 +137,36 @@ function ChatVideoRTC() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Efeito para monitorar o estado da tela cheia
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
-
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // --- Otimização de Subscrições ---
+  const handleEndCall = useCallback(async () => {
+    console.log("--- ENCERRANDO CHAMADA ---");
+    const callIdToUpdate = callState.callId;
+
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    
+    if (callIdToUpdate && session) {
+        await supabase.from('call_participants')
+            .update({ left_at: new Date().toISOString() })
+            .match({ call_id: callIdToUpdate, user_id: session.user.id });
+    }
+
+    cleanupCall(); 
+
+    if (callIdToUpdate) {
+      await supabase.from('calls').update({ end_time: new Date().toISOString() }).eq('id', callIdToUpdate);
+    }
+  }, [callState.callId, cleanupCall, session]);
+
+
   useEffect(() => {
     if (!session?.user?.id) return;
 
@@ -142,7 +194,6 @@ function ChatVideoRTC() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: `receiver_id=eq.${session.user.id}` }, 
       (payload) => {
         if (!payload.new.end_time && !callState.inCall) {
-          // Precisamos buscar o perfil do chamador
           supabase.from('profiles').select('id, username, avatar_url').eq('id', payload.new.created_by).single().then(({ data: caller }) => {
             console.log("Chamada recebida detectada:", payload.new);
             setCallState(prev => ({ ...prev, incomingCall: { ...payload.new, caller } }));
@@ -162,21 +213,10 @@ function ChatVideoRTC() {
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(callChannel);
     };
-  }, [session?.user?.id, selectedUser, callState.inCall, callState.callId]);
+  }, [session?.user?.id, selectedUser, callState.inCall, callState.callId, handleEndCall]);
 
 
-  // --- FUNÇÕES DE DADOS ---
-
-  const fetchMessages = async (userId: string, peerId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, sender:sender_id(username, avatar_url)')
-      .or(`(sender_id.eq.${userId},receiver_id.eq.${peerId}),(sender_id.eq.${peerId},receiver_id.eq.${userId})`)
-      .order('created_at', { ascending: true });
-
-    if (error) console.error("Erro ao buscar mensagens:", error);
-    else setMessages(data || []);
-  };
+  // --- FUNÇÕES DE MENSAGENS ---
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +229,7 @@ function ChatVideoRTC() {
       content,
       sender_id: session.user.id,
       receiver_id: selectedUser.id,
-      is_audio: false, // Adicionado para diferenciar
+      is_audio: false,
     });
 
     if (error) {
@@ -201,20 +241,13 @@ function ChatVideoRTC() {
   const handleCopyMessage = async (message: any) => {
     try {
       if (message.is_audio) {
-        // Tenta usar a API de compartilhamento para áudios (melhor para mobile)
         if (navigator.share) {
-          await navigator.share({
-            title: 'Áudio compartilhado',
-            text: `Mensagem de áudio de ${message.sender.username}`,
-            url: message.content,
-          });
+          await navigator.share({ title: 'Áudio compartilhado', text: `Mensagem de áudio de ${message.sender.username}`, url: message.content });
         } else {
-          // Fallback para copiar o link se a API de compartilhamento não estiver disponível
           await navigator.clipboard.writeText(message.content);
           alert('Link do áudio copiado para a área de transferência!');
         }
       } else {
-        // Copia o texto da mensagem
         await navigator.clipboard.writeText(message.content);
         alert('Mensagem copiada!');
       }
@@ -222,10 +255,18 @@ function ChatVideoRTC() {
       console.error("Falha ao copiar/compartilhar:", error);
       alert("Não foi possível copiar ou compartilhar o conteúdo.");
     } finally {
-        setSelectedMessageId(null); // Esconde o botão após a ação
+        setSelectedMessageId(null);
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    if (error) {
+      alert("Não foi possível apagar a mensagem.");
+      console.error("Erro ao apagar mensagem:", error);
+    }
+  };
+  
   // --- FUNÇÕES DE MENSAGEM DE ÁUDIO ---
 
   const handleStartRecording = async () => {
@@ -233,18 +274,12 @@ function ChatVideoRTC() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorderRef.current = new MediaRecorder(stream);
         audioChunksRef.current = [];
-
-        mediaRecorderRef.current.ondataavailable = event => {
-            audioChunksRef.current.push(event.data);
-        };
-
+        mediaRecorderRef.current.ondataavailable = event => audioChunksRef.current.push(event.data);
         mediaRecorderRef.current.onstop = async () => {
             const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
             await handleSendAudio(audioBlob);
-            // Limpa as faixas de mídia para desligar o indicador do microfone
             stream.getTracks().forEach(track => track.stop());
         };
-        
         mediaRecorderRef.current.start();
         setIsRecording(true);
     } catch (error) {
@@ -262,112 +297,44 @@ function ChatVideoRTC() {
 
   const handleSendAudio = async (audioBlob: Blob) => {
     if (!session || !selectedUser) return;
-
     const fileName = `audio_${Date.now()}.webm`;
     const filePath = `${session.user.id}/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-        .from('audio_messages')
-        .upload(filePath, audioBlob, {
-            cacheControl: '3600',
-            upsert: false,
-        });
-
+    const { error: uploadError } = await supabase.storage.from('audio_messages').upload(filePath, audioBlob);
     if (uploadError) {
         console.error('Erro no upload do áudio:', uploadError);
         alert('Falha ao enviar o áudio.');
         return;
     }
 
-    const { data: urlData } = supabase.storage
-      .from('audio_messages')
-      .getPublicUrl(filePath);
-
+    const { data: urlData } = supabase.storage.from('audio_messages').getPublicUrl(filePath);
     if (!urlData) {
       console.error('Não foi possível obter a URL pública do áudio.');
-      alert('Falha ao processar o áudio enviado.');
       return;
     }
     
-    const publicURL = urlData.publicUrl;
-
-    const { error: messageError } = await supabase.from('messages').insert({
-        content: publicURL,
-        sender_id: session.user.id,
-        receiver_id: selectedUser.id,
-        is_audio: true,
-    });
-
-    if (messageError) {
-        console.error('Erro ao salvar a mensagem de áudio:', messageError);
-        alert('Falha ao salvar a mensagem de áudio.');
-    }
+    const { error: messageError } = await supabase.from('messages').insert({ content: urlData.publicUrl, sender_id: session.user.id, receiver_id: selectedUser.id, is_audio: true });
+    if (messageError) console.error('Erro ao salvar a mensagem de áudio:', messageError);
   };
-
-  const handleDeleteMessage = async (messageId: string) => {
-    const { error } = await supabase.from('messages').delete().eq('id', messageId);
-    if (error) {
-      alert("Não foi possível apagar a mensagem.");
-      console.error("Erro ao apagar mensagem:", error);
-    }
-    // A remoção da UI é tratada pelo listener de 'DELETE'
-  };
-
-  const handleDeleteConversation = async () => {
-    if (!session || !selectedUser) return;
-
-    const userConfirmation = window.confirm("Tem certeza de que deseja excluir esta conversa? Suas mensagens serão removidas permanentemente.");
-    
-    if (userConfirmation) {
-      const messageIds = messages.map(msg => msg.id);
-
-      if (messageIds.length > 0) {
-        await supabase.from('messages').delete().in('id', messageIds);
-      }
-      
-      setMessages([]);
-    }
-  };
-
 
   // --- FUNÇÕES DE CHAMADA (WebRTC) ---
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-        videoContainerRef.current?.requestFullscreen().catch(err => {
-            console.error(`Erro ao tentar ativar o modo de tela cheia: ${err.message} (${err.name})`);
-        });
+        videoContainerRef.current?.requestFullscreen().catch(err => console.error(`Erro ao ativar tela cheia: ${err.message}`));
     } else {
         document.exitFullscreen();
     }
   }, []);
 
-  const cleanupCall = useCallback(() => {
-    console.log("Limpando recursos da chamada...");
-    if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
-    if (peerConnectionRef.current) peerConnectionRef.current.close();
-    if (rtcChannelRef.current) supabase.removeChannel(rtcChannelRef.current).catch(() => {});
-    
-    localStreamRef.current = null;
-    peerConnectionRef.current = null;
-    rtcChannelRef.current = null;
-    
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-
-    setCallState({ inCall: false, isJoining: false, callId: null, incomingCall: null });
-    console.log("Limpeza concluída. Estado da chamada resetado.");
-  }, []);
-
   const setupRtcConnection = async (stream: MediaStream, currentCallId: string, isCaller: boolean) => {
-    console.log(`Configurando conexão RTC para callId: ${currentCallId}. É o autor da chamada? ${isCaller}`);
+    console.log(`Configurando RTC para callId: ${currentCallId}. É o autor da chamada? ${isCaller}`);
     const pc = new RTCPeerConnection(peerConnectionConfig);
     peerConnectionRef.current = pc;
 
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     pc.ontrack = event => {
-      console.log("Track remota recebida.");
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
     };
 
@@ -375,43 +342,29 @@ function ChatVideoRTC() {
     rtcChannelRef.current = rtcCh;
 
     pc.onicecandidate = e => {
-      if (e.candidate) {
-        console.log("Enviando ICE candidate...");
-        rtcCh.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
-      }
+      if (e.candidate) rtcCh.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
     };
 
     rtcCh.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
-      if (payload) {
-        console.log("Recebendo ICE candidate...");
-        pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => console.error("Erro ao adicionar ICE candidate:", e));
-      }
+      if (payload) pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => console.error("Erro ao adicionar ICE candidate:", e));
     });
 
     if (isCaller) {
       rtcCh.on('broadcast', { event: 'answer' }, async ({ payload }) => {
-        if (payload && pc.signalingState !== 'stable') {
-          console.log("Recebendo resposta (answer)...");
-          await pc.setRemoteDescription(new RTCSessionDescription(payload));
-        }
+        if (payload && pc.signalingState !== 'stable') await pc.setRemoteDescription(new RTCSessionDescription(payload));
       });
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       
       rtcCh.subscribe(status => {
-        if (status === 'SUBSCRIBED') {
-          console.log("Canal RTC inscrito. Enviando oferta (offer)...");
-          rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
-        }
+        if (status === 'SUBSCRIBED') rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
       });
-    } else { // Is callee
+    } else {
       rtcCh.on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload) {
-            console.log("Recebendo oferta (offer)...");
             await pc.setRemoteDescription(new RTCSessionDescription(payload));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log("Enviando resposta (answer)...");
             rtcCh.send({ type: 'broadcast', event: 'answer', payload: answer });
         }
       });
@@ -420,43 +373,24 @@ function ChatVideoRTC() {
   };
 
   const getMediaAndStart = async (startFn: (stream: MediaStream) => Promise<void>) => {
-    console.log("Tentando acessar dispositivos de mídia (câmera e áudio)...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      console.log("Acesso à mídia bem-sucedido.");
       localStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-      // Se a função de início for chamada, a UI de vídeo já deve estar visível
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       await startFn(stream);
     } catch (error: any) {
-      console.error("----------------------------------------------------");
-      console.error("### ERRO CRÍTICO AO ACESSAR MÍDIA ###");
-      console.error("Tipo de Erro:", error.name);
-      console.error("Mensagem:", error.message);
-      console.error("----------------------------------------------------");
-      alert(`Falha ao acessar câmera/microfone: ${error.message}. Por favor, verifique as permissões do navegador e se os dispositivos estão conectados.`);
-      cleanupCall(); // Limpa e reseta o estado
+      alert(`Falha ao acessar câmera/microfone: ${error.message}. Verifique as permissões do navegador.`);
+      cleanupCall();
     }
   };
 
   const handleCreateCall = async () => {
-    console.log("--- INICIANDO NOVA CHAMADA ---");
-    if (!session || !selectedUser || callState.inCall) {
-      console.log("Pré-condições para chamada não atendidas.");
-      return;
-    }
+    if (!session || !selectedUser || callState.inCall) return;
 
     setCallState(prev => ({ ...prev, isJoining: true }));
-    console.log("1. Estado 'isJoining' definido como true.");
 
     await getMediaAndStart(async (stream) => {
-      console.log("2. Mídia obtida. Criando registro de chamada no banco de dados...");
-      const { data, error } = await supabase.from('calls').insert({
-        created_by: session.user.id,
-        receiver_id: selectedUser.id,
-      }).select().single();
+      const { data, error } = await supabase.from('calls').insert({ created_by: session.user.id, receiver_id: selectedUser.id }).select().single();
 
       if (error || !data) {
         console.error("Erro ao criar chamada no DB:", error);
@@ -465,50 +399,30 @@ function ChatVideoRTC() {
       }
       
       const newCallId = data.id;
-      console.log(`3. Chamada criada no DB com ID: ${newCallId}. Adicionando participante...`);
-
-      const { error: participantError } = await supabase.from('call_participants').insert({
-          call_id: newCallId,
-          user_id: session.user.id,
-      });
+      const { error: participantError } = await supabase.from('call_participants').insert({ call_id: newCallId, user_id: session.user.id });
 
       if (participantError) {
           console.error("Erro ao adicionar participante:", participantError);
-          await supabase.from('calls').delete().eq('id', newCallId); // Rollback
+          await supabase.from('calls').delete().eq('id', newCallId);
           cleanupCall();
           return;
       }
 
-      console.log("4. Participante adicionado. ATUALIZANDO ESTADO PARA 'inCall = true'.");
-      // Este é o passo crucial para exibir o vídeo
       setCallState(prev => ({ ...prev, callId: newCallId, inCall: true, incomingCall: null, isJoining: false }));
-      
-      console.log("5. Estado 'inCall' definido como true. Configurando a conexão WebRTC...");
       await setupRtcConnection(stream, newCallId, true);
-      console.log("6. Conexão WebRTC configurada.");
     });
   };
 
   const handleJoinCall = async () => {
-    console.log("--- ACEITANDO CHAMADA ---");
     if (!session || !callState.incomingCall) return;
     
-    // Define o usuário selecionado como o chamador
-    if (callState.incomingCall.caller) {
-        setSelectedUser(callState.incomingCall.caller);
-    }
+    if (callState.incomingCall.caller) setSelectedUser(callState.incomingCall.caller);
     
     setCallState(prev => ({ ...prev, isJoining: true }));
-    console.log("1. Estado 'isJoining' definido como true.");
 
     await getMediaAndStart(async (stream) => {
-        console.log("2. Mídia obtida. Adicionando participante à chamada...");
         const { id: incomingCallId } = callState.incomingCall;
-
-        const { error: participantError } = await supabase.from('call_participants').insert({
-            call_id: incomingCallId,
-            user_id: session.user.id,
-        });
+        const { error: participantError } = await supabase.from('call_participants').insert({ call_id: incomingCallId, user_id: session.user.id });
 
         if (participantError) {
             console.error("Erro ao adicionar participante:", participantError);
@@ -516,18 +430,8 @@ function ChatVideoRTC() {
             return;
         }
 
-        console.log("3. Participante adicionado. ATUALIZANDO ESTADO PARA 'inCall = true'.");
-        setCallState(prev => ({ 
-            ...prev, 
-            callId: incomingCallId, 
-            inCall: true, 
-            incomingCall: null,
-            isJoining: false,
-        }));
-
-        console.log("4. Estado 'inCall' definido como true. Configurando a conexão WebRTC...");
+        setCallState(prev => ({ ...prev, callId: incomingCallId, inCall: true, incomingCall: null, isJoining: false }));
         await setupRtcConnection(stream, incomingCallId, false);
-        console.log("5. Conexão WebRTC configurada.");
     });
   };
 
@@ -537,48 +441,21 @@ function ChatVideoRTC() {
     setCallState(prev => ({ ...prev, incomingCall: null }));
   };
 
-  const handleEndCall = useCallback(async () => {
-    console.log("--- ENCERRANDO CHAMADA ---");
-    const callIdToUpdate = callState.callId;
-
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    }
-    
-    if (callIdToUpdate && session) {
-        await supabase.from('call_participants')
-            .update({ left_at: new Date().toISOString() })
-            .match({ call_id: callIdToUpdate, user_id: session.user.id });
-    }
-
-    cleanupCall(); // A função de limpeza já contém logs
-
-    if (callIdToUpdate) {
-      await supabase.from('calls').update({ end_time: new Date().toISOString() }).eq('id', callIdToUpdate);
-    }
-  }, [callState.callId, cleanupCall, session]);
-
-  const handleExit = () => {
-    handleEndCall();
-    navigate('/');
-  };
-
   // --- RENDERIZAÇÃO ---
 
   if (loading) return <div>Carregando...</div>;
   if (!session) return <div>Você precisa estar logado para usar o chat.</div>
 
-  // Renderiza o botão de ação principal (Enviar vs Gravar)
   const renderMainActionButton = () => {
     if (newMessage.trim()) {
       return (
-        <button type="submit" aria-label="Enviar mensagem">
+        <button type="submit" form="message-form" aria-label="Enviar mensagem">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
       );
     }
     return (
-      <button type="button" onClick={isRecording ? handleStopRecording : handleStartRecording} aria-label={isRecording ? 'Parar gravação' : 'Iniciar gravação'}>
+      <button type="button" onMouseDown={handleStartRecording} onMouseUp={handleStopRecording} onTouchStart={handleStartRecording} onTouchEnd={handleStopRecording} aria-label={isRecording ? 'Parar gravação' : 'Iniciar gravação'}>
         {isRecording ? 
             <svg viewBox="0 0 24 24" width="24" height="24" fill="red"><path d="M12 14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2S10 4.9 10 6v6c0 1.1.9 2 2 2zm-1-8c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V6zm5 4h-1v1c0 2.76-2.24 5-5 5s-5-2.24-5-5v-1H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92z"/></svg> : 
             <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M12 14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2S10 4.9 10 6v6c0 1.1.9 2 2 2zm-1-8c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V6zm5 4h-1v1c0 2.76-2.24 5-5 5s-5-2.24-5-5v-1H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92z"/></svg>
@@ -589,27 +466,39 @@ function ChatVideoRTC() {
 
   return (
     <div className="chat-page-container" onClick={() => setSelectedMessageId(null)}>
-        {/* Modais de Chamada (ficam fora do layout principal) */}
         <NotificationBell />
+
         {callState.incomingCall && (
             <div className="incoming-call-modal">
-                {/* ... conteúdo do modal de chamada recebida ... */}
-            </div>
-        )}
-        {callState.inCall && (
-            <div className="video-container" ref={videoContainerRef}>
-                {/* ... conteúdo da video chamada ... */}
+                <p>{callState.incomingCall.caller?.username || 'Alguém'} está te ligando...</p>
+                <button onClick={handleJoinCall} className="accept-call">Aceitar</button>
+                <button onClick={handleDeclineCall} className="decline-call">Recusar</button>
             </div>
         )}
 
-        {/* Conteúdo principal do Chat */}
+        {callState.inCall && (
+            <div className="video-container" ref={videoContainerRef}>
+                <video ref={localVideoRef} autoPlay muted playsInline className="local-video"></video>
+                <video ref={remoteVideoRef} autoPlay playsInline className="remote-video"></video>
+                <div className="call-controls">
+                    <button onClick={handleEndCall} className="end-call">Encerrar</button>
+                    <button onClick={toggleFullscreen}>{isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}</button>
+                </div>
+            </div>
+        )}
+
         {!callState.inCall && (
             selectedUser ? (
             <>
                 <header className="chat-header">
+                    <button onClick={() => navigate('/contacts')} className="back-button">←</button>
                     <Avatar url={selectedUser.avatar_url} size={40} readOnly />
                     <div className="chat-with">{selectedUser.username}</div>
-                    {/* Botões de ação do cabeçalho podem ser adicionados aqui */}
+                    <div className="header-actions">
+                      <button onClick={handleCreateCall} disabled={callState.isJoining}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                      </button>
+                    </div>
                 </header>
 
                 <main className="messages-area">
@@ -617,10 +506,7 @@ function ChatVideoRTC() {
                     <div 
                       key={msg.id} 
                       className={`message-bubble ${msg.sender_id === session.user.id ? 'sent' : 'received'}`}
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedMessageId(selectedMessageId === msg.id ? null : msg.id);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedMessageId(selectedMessageId === msg.id ? null : msg.id); }}
                     >
                       {selectedMessageId === msg.id && (
                           <div className="message-actions">
@@ -643,15 +529,14 @@ function ChatVideoRTC() {
                 </main>
 
                 <footer className="message-input-area">
-                    <form onSubmit={handleSendMessage} style={{ display: 'flex', flexGrow: 1 }}>
+                    <form id="message-form" onSubmit={handleSendMessage} style={{ display: 'flex', flexGrow: 1 }}>
                         <input 
                             type="text" 
-                            placeholder="Mensagem" 
+                            placeholder={isRecording ? 'Gravando...' : 'Mensagem'}
                             value={newMessage}
                             onChange={e => setNewMessage(e.target.value)}
                             disabled={isRecording}
                         />
-                        {/* O botão será renderizado fora do form para alternar a função */} 
                     </form>
                     {renderMainActionButton()}
                 </footer>
