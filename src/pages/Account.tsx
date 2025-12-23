@@ -1,4 +1,4 @@
-
+qu
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import Avatar from "../Avatar";
@@ -6,6 +6,7 @@ import { Session } from "@supabase/supabase-js";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { Link } from "react-router-dom";
+import "./Account.css";
 
 export default function Account({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
@@ -134,17 +135,10 @@ export default function Account({ session }: { session: Session }) {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "1rem",
-        }}
-      >
+      <div className="account-header">
         <h1 className="header">Sua Conta</h1>
         <div className="menu-buttons">
-          <div className="dropdown-container" style={{ position: "relative" }}>
+          <div className="dropdown-container">
             <button
               className="button primary"
               onClick={() => setDropdownVisible(!dropdownVisible)}
@@ -152,34 +146,14 @@ export default function Account({ session }: { session: Session }) {
               Ações
             </button>
             {dropdownVisible && (
-              <div
-                className="dropdown-menu"
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  backgroundColor: "white",
-                  zIndex: 1000,
-                }}
-              >
-                <button
-                  onClick={() => { handleCopyList(); setDropdownVisible(false); }}
-                  style={{ display: "block", width: "100%", textAlign: "left" }}
-                >
+              <div className="dropdown-menu">
+                <button onClick={() => { handleCopyList(); setDropdownVisible(false); }}>
                   Copiar Lista
                 </button>
-                <button
-                  onClick={() => { handleShareList(); setDropdownVisible(false); }}
-                  style={{ display: "block", width: "100%", textAlign: "left" }}
-                >
+                <button onClick={() => { handleShareList(); setDropdownVisible(false); }}>
                   Compartilhar Lista
                 </button>
-                <button
-                  onClick={() => { generatePdf(); setDropdownVisible(false); }}
-                  style={{ display: "block", width: "100%", textAlign: "left" }}
-                >
+                <button onClick={() => { generatePdf(); setDropdownVisible(false); }}>
                   Gerar PDF da Lista
                 </button>
               </div>

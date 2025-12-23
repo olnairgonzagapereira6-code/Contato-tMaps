@@ -33,7 +33,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="container" style={{ padding: '50px 0 100px 0' }}>
+      <div className="container">
         <Routes>
             <Route path="/chat" element={session ? <ChatVideoRTC /> : <Auth />} />
             <Route path="/contacts" element={session ? <Contacts /> : <Auth />} />

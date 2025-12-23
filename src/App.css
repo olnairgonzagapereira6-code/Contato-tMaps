@@ -1,1 +1,8 @@
-/* Estilos globais do App podem ser adicionados aqui */
+.container {
+  width: 800px;
+  height: 600px;
+  margin: auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  overflow: auto;
+}

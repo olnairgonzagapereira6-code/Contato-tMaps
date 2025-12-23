@@ -1,25 +1,20 @@
 /* Estilos para a página de contatos */
 .contacts-page-container {
   display: flex;
-  justify-content: center; /* Centraliza a lista de contatos */
-  align-items: flex-start; /* Alinha ao topo */
-  height: 100vh;
-  width: 100vw;
-  padding-top: 5%; /* Adiciona um espaço no topo */
+  flex-direction: column;
+  height: 100%; /* Fill parent container */
+  width: 100%; /* Fill parent container */
   background-color: #f0f2f5;
 }
 
+/* This was named sidebar, but it's the main container for the contacts list */
 .user-list-sidebar {
-  width: 90%; /* Ocupa a maior parte da largura */
-  max-width: 500px; /* Limita a largura máxima */
-  height: 80vh; /* Altura ajustada */
-  max-height: 700px; /* Limita a altura máxima */
+  width: 100%;
+  height: 100%;
   background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Garante que o conteúdo interno respeite as bordas arredondadas */
+  overflow: hidden;
 }
 
 .user-list-sidebar h1 {
@@ -29,6 +24,7 @@
     margin: 0;
     background-color: #f8f9fa;
     border-bottom: 1px solid #ccc;
+    flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .user-list {
@@ -59,7 +55,7 @@
 .back-to-chat-button {
     display: block;
     width: fit-content;
-    margin: 20px auto;
+    margin: 20px auto; /* Centered */
     padding: 10px 25px;
     font-size: 1em;
     color: white;
@@ -69,6 +65,7 @@
     cursor: pointer;
     text-decoration: none;
     transition: background-color 0.2s;
+    flex-shrink: 0; /* Prevent button from shrinking */
 }
 
 .back-to-chat-button:hover {
