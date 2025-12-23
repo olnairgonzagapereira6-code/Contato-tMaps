@@ -36,6 +36,12 @@ function ChatVideoRTC() {
   const [newMessage, setNewMessage] = useState('');
   const navigate = useNavigate();
 
+  // --- Novos estados para gravação de áudio ---
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+
   const [callState, setCallState] = useState<{
     inCall: boolean;
     isJoining: boolean;
@@ -186,11 +192,90 @@ function ChatVideoRTC() {
       content,
       sender_id: session.user.id,
       receiver_id: selectedUser.id,
+      is_audio: false, // Adicionado para diferenciar
     });
 
     if (error) {
         alert("Não foi possível enviar a mensagem.");
         console.error("Erro ao enviar mensagem:", error);
+    }
+  };
+
+  // --- FUNÇÕES DE MENSAGEM DE ÁUDIO ---
+
+  const handleStartRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorderRef.current = new MediaRecorder(stream);
+        audioChunksRef.current = [];
+
+        mediaRecorderRef.current.ondataavailable = event => {
+            audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorderRef.current.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            await handleSendAudio(audioBlob);
+            // Limpa as faixas de mídia para desligar o indicador do microfone
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorderRef.current.start();
+        setIsRecording(true);
+    } catch (error) {
+        console.error("Erro ao iniciar a gravação de áudio:", error);
+        alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
+    }
+  };
+
+  const handleStopRecording = () => {
+      if (mediaRecorderRef.current && isRecording) {
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+      }
+  };
+
+  const handleSendAudio = async (audioBlob: Blob) => {
+    if (!session || !selectedUser) return;
+
+    const fileName = `audio_${Date.now()}.webm`;
+    const filePath = `${session.user.id}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('audio_messages')
+        .upload(filePath, audioBlob, {
+            cacheControl: '3600',
+            upsert: false,
+        });
+
+    if (uploadError) {
+        console.error('Erro no upload do áudio:', uploadError);
+        alert('Falha ao enviar o áudio.');
+        return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('audio_messages')
+      .getPublicUrl(filePath);
+
+    if (!urlData) {
+      console.error('Não foi possível obter a URL pública do áudio.');
+      alert('Falha ao processar o áudio enviado.');
+      return;
+    }
+    
+    const publicURL = urlData.publicUrl;
+
+    const { error: messageError } = await supabase.from('messages').insert({
+        content: publicURL,
+        sender_id: session.user.id,
+        receiver_id: selectedUser.id,
+        is_audio: true,
+    });
+
+    if (messageError) {
+        console.error('Erro ao salvar a mensagem de áudio:', messageError);
+        alert('Falha ao salvar a mensagem de áudio.');
     }
   };
 
@@ -456,6 +541,11 @@ function ChatVideoRTC() {
   if (loading) return <div>Carregando...</div>;
   if (!session) return <div>Você precisa estar logado para usar o chat.</div>
 
+  // Função para verificar se o conteúdo é uma URL de áudio
+  const isAudioMessage = (content: string) => {
+    return content.startsWith('http') && (content.endsWith('.webm') || content.endsWith('.mp3') || content.endsWith('.ogg'));
+  };
+
   return (
     <div className="chat-page-container">
       <NotificationBell />
@@ -491,7 +581,7 @@ function ChatVideoRTC() {
       )}
 
       <aside className={`user-list-sidebar ${callState.inCall ? 'hidden' : ''}`}>
-        <header className="user-list-header">Contatos</header>
+        <h1>CONTATOS</h1>
         <div className="user-list">
           {users.map(user => (
             <div 
@@ -532,7 +622,11 @@ function ChatVideoRTC() {
               {messages.map(msg => (
                 <div key={msg.id} className={`message-wrapper ${msg.sender_id === session.user.id ? 'outgoing-wrapper' : 'incoming-wrapper'}`}>
                   <div className={`message ${msg.sender_id === session.user.id ? 'outgoing' : 'incoming'}`}>
-                    <p>{msg.content}</p>
+                    {msg.is_audio ? (
+                      <audio controls src={msg.content}></audio>
+                    ) : (
+                      <p>{msg.content}</p>
+                    )}
                   </div>
                   {msg.sender_id === session.user.id && (
                     <button onClick={() => handleDeleteMessage(msg.id)} className="delete-message-button" aria-label="Apagar mensagem">
@@ -551,10 +645,17 @@ function ChatVideoRTC() {
                   placeholder="Digite sua mensagem..." 
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
-                  disabled={callState.inCall}
+                  disabled={callState.inCall || isRecording}
                 />
-                <button type="submit" disabled={callState.inCall}>Enviar</button>
+                <button type="submit" disabled={callState.inCall || isRecording || !newMessage.trim()}>Enviar</button>
               </form>
+              <button 
+                onClick={isRecording ? handleStopRecording : handleStartRecording}
+                disabled={callState.inCall}
+                className={`mic-button ${isRecording ? 'recording' : ''}`}
+              >
+                {isRecording ? '🛑' : '🎤'}
+              </button>
             </footer>
           </div>
         ) : (

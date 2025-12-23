@@ -55,7 +55,7 @@ export default function Auth() {
   return (
     <div className="row flex-center">
       <div className="col-6 form-widget" aria-live="polite">
-        <h1 className="header">Supabase + React</h1>
+        <h1 className="header">TheZap</h1>
         <p className="description">
           {isSignUp ? "Crie uma nova conta" : "Faça login em sua conta"}
         </p>
