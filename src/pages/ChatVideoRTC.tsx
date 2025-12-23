@@ -3,7 +3,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Session, RealtimeChannel, User } from '@supabase/supabase-js';
 import Avatar from '../Avatar';
+import NotificationBell from '../components/NotificationBell'; // Importa o sino
 import './ChatVideoRTC.css';
+
+// Efeito para registrar o Service Worker uma vez
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(registration => {
+      console.log('Service Worker registrado com sucesso:', registration);
+    }).catch(error => {
+      console.log('Falha ao registrar o Service Worker:', error);
+    });
+  });
+}
 
 const peerConnectionConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -191,19 +203,25 @@ function ChatVideoRTC() {
     pc.onicecandidate = e => e.candidate && rtcCh.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
 
     rtcCh.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
-        if (payload) pc.addIceCandidate(new RTCIceCandidate(payload));
+      if (payload) pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => console.error("Erro ao adicionar ICE candidate:", e));
     });
 
     if (isCaller) {
-      rtcCh.on('broadcast', { event: 'answer' }, ({ payload }) => {
-        if (payload) pc.setRemoteDescription(new RTCSessionDescription(payload));
+      rtcCh.on('broadcast', { event: 'answer' }, async ({ payload }) => {
+        // Await a resposta para evitar race conditions
+        if (payload && pc.signalingState !== 'stable') {
+          await pc.setRemoteDescription(new RTCSessionDescription(payload));
+        }
       });
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      
       rtcCh.subscribe(status => {
-        if (status === 'SUBSCRIBED') rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
+        if (status === 'SUBSCRIBED') {
+          rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
+        }
       });
-    } else { // Is Callee
+    } else { // É quem recebe a chamada
       rtcCh.on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload) {
             await pc.setRemoteDescription(new RTCSessionDescription(payload));
@@ -234,7 +252,6 @@ function ChatVideoRTC() {
 
     setCallState(prev => ({ ...prev, isJoining: true }));
     await getMediaAndStart(async (stream) => {
-      // 1. Criar a chamada
       const { data, error } = await supabase.from('calls').insert({
         created_by: session.user.id,
         receiver_id: selectedUser.id,
@@ -248,7 +265,6 @@ function ChatVideoRTC() {
       
       const newCallId = data.id;
 
-      // 2. Adicionar o criador como participante
       const { error: participantError } = await supabase.from('call_participants').insert({
           call_id: newCallId,
           user_id: session.user.id,
@@ -256,13 +272,11 @@ function ChatVideoRTC() {
 
       if (participantError) {
           console.error("Erro ao inserir criador na chamada:", participantError);
-          // Tenta reverter a chamada criada
           await supabase.from('calls').delete().eq('id', newCallId);
           cleanupCall();
           return;
       }
 
-      // 3. Continuar com o estado e WebRTC
       setCallState(prev => ({ ...prev, callId: newCallId, inCall: true, incomingCall: null, isJoining: false }));
       await setupRtcConnection(stream, newCallId, true);
     });
@@ -279,7 +293,6 @@ function ChatVideoRTC() {
     await getMediaAndStart(async (stream) => {
         const { id: incomingCallId } = callState.incomingCall;
 
-        // 1. Adicionar o usuário que atende como participante
         const { error: participantError } = await supabase.from('call_participants').insert({
             call_id: incomingCallId,
             user_id: session.user.id,
@@ -291,7 +304,6 @@ function ChatVideoRTC() {
             return;
         }
 
-        // 2. Continuar com o estado e WebRTC
         setCallState(prev => ({ 
             ...prev, 
             callId: incomingCallId, 
@@ -312,16 +324,14 @@ function ChatVideoRTC() {
   const handleEndCall = useCallback(async () => {
     const callIdToUpdate = callState.callId;
     
-    // Atualiza o 'left_at' para o usuário atual
     if (callIdToUpdate && session) {
         await supabase.from('call_participants')
             .update({ left_at: new Date().toISOString() })
             .match({ call_id: callIdToUpdate, user_id: session.user.id });
     }
 
-    cleanupCall(); // Limpa estados locais primeiro
+    cleanupCall();
 
-    // Encerra a chamada na tabela 'calls'
     if (callIdToUpdate) {
       await supabase.from('calls').update({ end_time: new Date().toISOString() }).eq('id', callIdToUpdate);
     }
@@ -334,6 +344,8 @@ function ChatVideoRTC() {
 
   return (
     <div className="chat-page-container">
+      <NotificationBell />
+
       {callState.incomingCall && (
         <div className="incoming-call-modal">
           <div className="incoming-call-content">

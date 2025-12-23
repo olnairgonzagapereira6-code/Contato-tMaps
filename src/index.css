@@ -7,7 +7,7 @@
   color-scheme: dark;
   color: #00ff00; /* Neon Green */
   background-color: #000000;
-  text-shadow: 0 0 5px #00ff00, 0 0 10px #00ff00, 0 0 15px #00ff00;
+  /* REMOVED text-shadow from root to disable global neon effect */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,6 +19,7 @@ a {
   font-weight: 500;
   color: #ff00ff; /* Neon Magenta */
   text-decoration: inherit;
+  /* Kept the shadow for links */
   text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff;
   transition: color 0.25s, text-shadow 0.25s;
 }
@@ -40,6 +41,7 @@ h1 {
   font-size: 3.2em;
   line-height: 1.1;
   color: #00ffff; /* Neon Cyan */
+  /* Kept the shadow for h1 elements */
   text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
 }
 
