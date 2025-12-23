@@ -192,15 +192,12 @@ function ChatVideoRTC() {
     const userConfirmation = window.confirm("Tem certeza de que deseja excluir esta conversa? Suas mensagens serão removidas permanentemente.");
     
     if (userConfirmation) {
-      // Pega os IDs de todas as mensagens na conversa atual
       const messageIds = messages.map(msg => msg.id);
 
       if (messageIds.length > 0) {
-        // Tenta apagar todas (RLS garantirá que apenas as do próprio usuário sejam apagadas)
         await supabase.from('messages').delete().in('id', messageIds);
       }
       
-      // Limpa a UI imediatamente
       setMessages([]);
     }
   };
@@ -209,7 +206,7 @@ function ChatVideoRTC() {
   // --- FUNÇÕES DE CHAMADA (WebRTC) ---
 
   const cleanupCall = useCallback(() => {
-    console.log("Cleaning up call resources...");
+    console.log("Limpando recursos da chamada...");
     if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
     if (peerConnectionRef.current) peerConnectionRef.current.close();
     if (rtcChannelRef.current) supabase.removeChannel(rtcChannelRef.current).catch(() => {});
@@ -222,30 +219,42 @@ function ChatVideoRTC() {
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
 
     setCallState({ inCall: false, isJoining: false, callId: null, incomingCall: null });
+    console.log("Limpeza concluída. Estado da chamada resetado.");
   }, []);
 
   const setupRtcConnection = async (stream: MediaStream, currentCallId: string, isCaller: boolean) => {
+    console.log(`Configurando conexão RTC para callId: ${currentCallId}. É o autor da chamada? ${isCaller}`);
     const pc = new RTCPeerConnection(peerConnectionConfig);
     peerConnectionRef.current = pc;
 
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     pc.ontrack = event => {
+      console.log("Track remota recebida.");
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
     };
 
     const rtcCh = supabase.channel(`call:${currentCallId}`, { config: { broadcast: { self: true } } });
     rtcChannelRef.current = rtcCh;
 
-    pc.onicecandidate = e => e.candidate && rtcCh.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+    pc.onicecandidate = e => {
+      if (e.candidate) {
+        console.log("Enviando ICE candidate...");
+        rtcCh.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+      }
+    };
 
     rtcCh.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
-      if (payload) pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => console.error("Erro ao adicionar ICE candidate:", e));
+      if (payload) {
+        console.log("Recebendo ICE candidate...");
+        pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => console.error("Erro ao adicionar ICE candidate:", e));
+      }
     });
 
     if (isCaller) {
       rtcCh.on('broadcast', { event: 'answer' }, async ({ payload }) => {
         if (payload && pc.signalingState !== 'stable') {
+          console.log("Recebendo resposta (answer)...");
           await pc.setRemoteDescription(new RTCSessionDescription(payload));
         }
       });
@@ -254,15 +263,18 @@ function ChatVideoRTC() {
       
       rtcCh.subscribe(status => {
         if (status === 'SUBSCRIBED') {
+          console.log("Canal RTC inscrito. Enviando oferta (offer)...");
           rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
         }
       });
-    } else {
+    } else { // Is callee
       rtcCh.on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload) {
+            console.log("Recebendo oferta (offer)...");
             await pc.setRemoteDescription(new RTCSessionDescription(payload));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            console.log("Enviando resposta (answer)...");
             rtcCh.send({ type: 'broadcast', event: 'answer', payload: answer });
         }
       });
@@ -271,35 +283,52 @@ function ChatVideoRTC() {
   };
 
   const getMediaAndStart = async (startFn: (stream: MediaStream) => Promise<void>) => {
+    console.log("Tentando acessar dispositivos de mídia (câmera e áudio)...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      console.log("Acesso à mídia bem-sucedido.");
       localStreamRef.current = stream;
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      // Se a função de início for chamada, a UI de vídeo já deve estar visível
       await startFn(stream);
     } catch (error: any) {
-      alert(`Falha ao obter mídia: ${error.message}`);
-      console.error("Erro de mídia:", error);
-      cleanupCall();
+      console.error("----------------------------------------------------");
+      console.error("### ERRO CRÍTICO AO ACESSAR MÍDIA ###");
+      console.error("Tipo de Erro:", error.name);
+      console.error("Mensagem:", error.message);
+      console.error("----------------------------------------------------");
+      alert(`Falha ao acessar câmera/microfone: ${error.message}. Por favor, verifique as permissões do navegador e se os dispositivos estão conectados.`);
+      cleanupCall(); // Limpa e reseta o estado
     }
   };
 
   const handleCreateCall = async () => {
-    if (!session || !selectedUser || callState.inCall) return;
+    console.log("--- INICIANDO NOVA CHAMADA ---");
+    if (!session || !selectedUser || callState.inCall) {
+      console.log("Pré-condições para chamada não atendidas.");
+      return;
+    }
 
     setCallState(prev => ({ ...prev, isJoining: true }));
+    console.log("1. Estado 'isJoining' definido como true.");
+
     await getMediaAndStart(async (stream) => {
+      console.log("2. Mídia obtida. Criando registro de chamada no banco de dados...");
       const { data, error } = await supabase.from('calls').insert({
         created_by: session.user.id,
         receiver_id: selectedUser.id,
       }).select().single();
 
       if (error || !data) {
-        console.error("Erro ao criar chamada:", error);
+        console.error("Erro ao criar chamada no DB:", error);
         cleanupCall();
         return;
       }
       
       const newCallId = data.id;
+      console.log(`3. Chamada criada no DB com ID: ${newCallId}. Adicionando participante...`);
 
       const { error: participantError } = await supabase.from('call_participants').insert({
           call_id: newCallId,
@@ -307,26 +336,34 @@ function ChatVideoRTC() {
       });
 
       if (participantError) {
-          console.error("Erro ao inserir criador na chamada:", participantError);
-          await supabase.from('calls').delete().eq('id', newCallId);
+          console.error("Erro ao adicionar participante:", participantError);
+          await supabase.from('calls').delete().eq('id', newCallId); // Rollback
           cleanupCall();
           return;
       }
 
+      console.log("4. Participante adicionado. ATUALIZANDO ESTADO PARA 'inCall = true'.");
+      // Este é o passo crucial para exibir o vídeo
       setCallState(prev => ({ ...prev, callId: newCallId, inCall: true, incomingCall: null, isJoining: false }));
+      
+      console.log("5. Estado 'inCall' definido como true. Configurando a conexão WebRTC...");
       await setupRtcConnection(stream, newCallId, true);
+      console.log("6. Conexão WebRTC configurada.");
     });
   };
 
   const handleJoinCall = async () => {
+    console.log("--- ACEITANDO CHAMADA ---");
     if (!session || !callState.incomingCall) return;
     
     const callerProfile = users.find(u => u.id === callState.incomingCall.created_by);
     if (callerProfile) setSelectedUser(callerProfile);
     
     setCallState(prev => ({ ...prev, isJoining: true }));
+    console.log("1. Estado 'isJoining' definido como true.");
 
     await getMediaAndStart(async (stream) => {
+        console.log("2. Mídia obtida. Adicionando participante à chamada...");
         const { id: incomingCallId } = callState.incomingCall;
 
         const { error: participantError } = await supabase.from('call_participants').insert({
@@ -335,11 +372,12 @@ function ChatVideoRTC() {
         });
 
         if (participantError) {
-            console.error("Erro ao inserir participante na chamada:", participantError);
+            console.error("Erro ao adicionar participante:", participantError);
             cleanupCall();
             return;
         }
 
+        console.log("3. Participante adicionado. ATUALIZANDO ESTADO PARA 'inCall = true'.");
         setCallState(prev => ({ 
             ...prev, 
             callId: incomingCallId, 
@@ -347,7 +385,10 @@ function ChatVideoRTC() {
             incomingCall: null,
             isJoining: false,
         }));
+
+        console.log("4. Estado 'inCall' definido como true. Configurando a conexão WebRTC...");
         await setupRtcConnection(stream, incomingCallId, false);
+        console.log("5. Conexão WebRTC configurada.");
     });
   };
 
@@ -358,6 +399,7 @@ function ChatVideoRTC() {
   };
 
   const handleEndCall = useCallback(async () => {
+    console.log("--- ENCERRANDO CHAMADA ---");
     const callIdToUpdate = callState.callId;
     
     if (callIdToUpdate && session) {
@@ -366,7 +408,7 @@ function ChatVideoRTC() {
             .match({ call_id: callIdToUpdate, user_id: session.user.id });
     }
 
-    cleanupCall();
+    cleanupCall(); // A função de limpeza já contém logs
 
     if (callIdToUpdate) {
       await supabase.from('calls').update({ end_time: new Date().toISOString() }).eq('id', callIdToUpdate);
@@ -413,7 +455,7 @@ function ChatVideoRTC() {
         </div>
       )}
 
-      <aside className={`user-list-sidebar ${callState.inCall ? 'hidden' : ''}`}>\
+      <aside className={`user-list-sidebar ${callState.inCall ? 'hidden' : ''}`}>
         <header className="user-list-header">Contatos</header>
         <div className="user-list">
           {users.map(user => (
@@ -429,7 +471,7 @@ function ChatVideoRTC() {
         </div>
       </aside>
 
-      <main className={`chat-area-content ${callState.inCall ? 'hidden' : ''}`}>\
+      <main className={`chat-area-content ${callState.inCall ? 'hidden' : ''}`}>
         {selectedUser ? (
           <div className="main-chat">
             <header className="chat-header">
@@ -484,7 +526,7 @@ function ChatVideoRTC() {
           <div className="chat-placeholder">
             <h2>Selecione um usuário para começar a conversar</h2>
           </div>
-        )}\
+        )}
       </main>
     </div>
   );
