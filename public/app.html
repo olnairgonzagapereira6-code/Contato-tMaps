@@ -1,63 +1,52 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>App Chat</title>
-  <link rel="stylesheet" href="./css/app.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>App Chat Fullscreen Android</title>
+  <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
 
 <div class="app-container">
 
-  <!-- COLUNA: LISTA DE CONTATOS -->
-  <aside class="contacts-panel">
-    <header class="contacts-header">Contatos</header>
-    <ul class="contacts-list">
-      <li class="contact active">Contato 1</li>
-      <li class="contact">Contato 2</li>
-      <li class="contact">Contato 3</li>
-    </ul>
-  </aside>
-
-  <!-- COLUNA: CHAT -->
+  <!-- CHAT FULLSCREEN -->
   <section class="chat-panel">
-
-    <!-- HEADER CHAT -->
     <header class="chat-header">
-      <span class="chat-user">Contato</span>
+      <div class="chat-left">
+        <button class="btn contacts-toggle" title="Abrir contatos">☰</button>
+        <span class="chat-user">Contato</span>
+      </div>
       <div class="chat-actions">
+        <button class="btn notify" title="Aceitar notificações">🔔</button>
         <button class="btn video">📹</button>
         <button class="btn clear">🗑</button>
         <button class="btn exit">Sair</button>
       </div>
     </header>
 
-    <!-- MENSAGENS -->
     <main class="chat-messages">
       <div class="msg received">Olá 👋</div>
       <div class="msg sent">Oi, tudo bem?</div>
     </main>
 
-    <!-- INPUT -->
     <footer class="chat-input">
       <button class="btn mic">🎤</button>
-      <input type="text" placeholder="Digite uma mensagem" />
+      <input type="text" placeholder="Digite uma mensagem">
       <button class="btn send">➤</button>
     </footer>
-
   </section>
 
-  <!-- COLUNA: VIDEOCHAMADA -->
+  <!-- VIDEO FULLSCREEN -->
   <section class="video-panel">
-
     <header class="video-header">
       <span>Videochamada</span>
       <button class="btn exit">Sair</button>
     </header>
 
     <div class="video-area">
-      <div class="video remote">Vídeo remoto</div>
-      <div class="video local">Seu vídeo</div>
+      <div class="video remote">Vídeo Receptor</div>
+      <div class="video local">Seu Vídeo</div>
     </div>
 
     <footer class="video-controls">
@@ -66,9 +55,26 @@
       <button class="vbtn call">📞</button>
       <button class="vbtn end">⛔</button>
     </footer>
-
   </section>
 
+</div>
+
+<!-- MENU SUSPENSO DE CONTATOS -->
+<div class="contacts-overlay">
+  <header class="overlay-header">
+    <span>Contatos</span>
+    <button class="btn close-contacts">✖</button>
+  </header>
+  <ul class="contacts-list">
+    <li class="contact active">Contato 1</li>
+    <li class="contact">Contato 2</li>
+    <li class="contact">Contato 3</li>
+  </ul>
+</div>
+
+<!-- POP-UP CHAMADA -->
+<div class="incoming-call-popup">
+  <span>Alguém está ligando...</span>
 </div>
 
 </body>

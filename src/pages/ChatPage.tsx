@@ -5,12 +5,9 @@ import { Session, RealtimeChannel, User, AuthChangeEvent } from '@supabase/supab
 import Avatar from '../Avatar';
 import AudioPlayer from '../components/AudioPlayer';
 import { useNavigate } from 'react-router-dom';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import './app.css';
 
-// Importa o novo CSS do template.
-// Estilos antigos de Contacts.css e ChatVideoRTC.css serão incorporados ou substituídos aqui.
-import './app.css'; 
-
-// Service Worker (mantido de ChatVideoRTC)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(registration => {
@@ -21,7 +18,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Configuração de servidores STUN/TURN (mantido de ChatVideoRTC)
 const peerConnectionConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -40,9 +36,10 @@ function ChatPage() {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const { isSubscribed, subscribeToPush, error: pushError } = usePushNotifications();
 
-    // Estado combinado de Contacts.tsx e ChatVideoRTC.tsx
-    const [users, setUsers] = useState<Profile[]>([]); // Lista de contatos
+
+    const [users, setUsers] = useState<Profile[]>([]);
     const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
@@ -50,6 +47,9 @@ function ChatPage() {
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+
+    const [isContactsOverlayVisible, setContactsOverlayVisible] = useState(false);
+
 
     const [callState, setCallState] = useState<{
         inCall: boolean;
@@ -63,7 +63,6 @@ function ChatPage() {
         incomingCall: null,
     });
 
-    // Refs para elementos DOM e objetos WebRTC
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -71,7 +70,6 @@ function ChatPage() {
     const rtcChannelRef = useRef<RealtimeChannel | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // --- LÓGICA DE AUTENTICAÇÃO E INICIALIZAÇÃO ---
 
     useEffect(() => {
         const getSession = async () => {
@@ -102,8 +100,6 @@ function ChatPage() {
         };
     }, []);
 
-    // --- LÓGICA DE CONTATOS (de Contacts.tsx) ---
-
     const fetchUsers = async (currentSession: Session) => {
         const { data, error } = await supabase.from('profiles').select('id, username, avatar_url');
         if (error) {
@@ -116,10 +112,9 @@ function ChatPage() {
     const handleSelectUser = (user: Profile) => {
         if (selectedUser?.id === user.id) return;
         setSelectedUser(user);
+        setContactsOverlayVisible(false);
     };
     
-    // --- LÓGICA DE MENSAGENS (de ChatVideoRTC.tsx) ---
-
     const fetchMessages = useCallback(async (userId: string, peerId: string) => {
         const { data, error } = await supabase
           .from('messages')
@@ -176,9 +171,6 @@ function ChatPage() {
         }
     };
 
-
-    // --- LÓGICA DE ÁUDIO (de ChatVideoRTC.tsx) ---
-
     const handleStartRecording = async () => {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert("Seu navegador não suporta gravação de áudio.");
@@ -226,8 +218,6 @@ function ChatPage() {
         const { error: messageError } = await supabase.from('messages').insert({ content: urlData.publicUrl, sender_id: session.user.id, receiver_id: selectedUser.id, is_audio: true });
         if (messageError) console.error('Erro ao salvar mensagem de áudio:', messageError);
     };
-
-    // --- LÓGICA DE VIDEOCHAMADA (WebRTC, de ChatVideoRTC.tsx) ---
 
     const cleanupCall = useCallback(() => {
         console.log("Limpando recursos da chamada...");
@@ -332,7 +322,7 @@ function ChatPage() {
           rtcCh.subscribe(status => {
             if (status === 'SUBSCRIBED') rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
           });
-        } else { // Is Callee
+        } else {
           rtcCh.on('broadcast', { event: 'offer' }, async ({ payload }) => {
             if (payload) {
                 await pc.setRemoteDescription(new RTCSessionDescription(payload));
@@ -378,7 +368,6 @@ function ChatPage() {
     const handleJoinCall = async () => {
         if (!session || !callState.incomingCall) return;
         
-        // Garante que o usuário selecionado é quem está ligando
         if (callState.incomingCall.caller) setSelectedUser(callState.incomingCall.caller);
         
         setCallState(prev => ({ ...prev, isJoining: true }));
@@ -402,7 +391,6 @@ function ChatPage() {
         else navigate('/');
     }
 
-    // --- RENDERIZAÇÃO ---
     if (loading) return <div>Carregando...</div>;
     if (!session) { navigate('/'); return null; };
     
@@ -410,93 +398,72 @@ function ChatPage() {
 
     return (
         <div className="app-container">
-            {/* Modal de Chamada Recebida */}
+
             {callState.incomingCall && (
-                <div className="incoming-call-modal">
-                     <p>{callState.incomingCall.caller?.username || 'Alguém'} está te ligando...</p>
-                    <button onClick={handleJoinCall} className="accept-call">Aceitar</button>
-                    <button onClick={handleDeclineCall} className="decline-call">Recusar</button>
+                <div className="incoming-call-popup">
+                    <span>{callState.incomingCall.caller?.username || 'Alguém'} está ligando...</span>
+                    <button onClick={handleJoinCall}>Aceitar</button>
+                    <button onClick={handleDeclineCall}>Recusar</button>
                 </div>
             )}
+            
+            <section className="chat-panel" style={{display: isVideoPanelVisible ? 'none' : 'flex' }}>
+              <header className="chat-header">
+                <div className="chat-left">
+                  <button className="btn contacts-toggle" title="Abrir contatos" onClick={() => setContactsOverlayVisible(true)}>☰</button>
+                  <span className="chat-user">{selectedUser ? selectedUser.username : 'Selecione um contato'}</span>
+                </div>
+                <div className="chat-actions">
+                  {!isSubscribed && <button className="btn notify" title="Aceitar notificações" onClick={subscribeToPush}>🔔</button>}
+                  {pushError && <span style={{color: 'red'}}>Erro push</span>}
+                  <button className="btn video" onClick={handleCreateCall} disabled={!selectedUser || callState.inCall || callState.isJoining}>📹</button>
+                  <button className="btn clear" onClick={handleClearChat} disabled={!selectedUser}>🗑</button>
+                  <button className="btn exit" onClick={handleLogout}>Sair</button>
+                </div>
+              </header>
 
-            {/* COLUNA: LISTA DE CONTATOS */}
-            <aside className="contacts-panel">
-                <header className="contacts-header">Contatos</header>
-                <ul className="contacts-list">
-                    {users.length > 0 ? (
-                        users.map(user => (
-                            <li 
-                                key={user.id} 
-                                className={`contact ${selectedUser?.id === user.id ? 'active' : ''}`}
-                                onClick={() => handleSelectUser(user)}
-                            >
-                                <Avatar url={user.avatar_url} size={40} readOnly/>
-                                <span style={{marginLeft: '10px'}}>{user.username || 'Usuário'}</span>
-                            </li>
-                        ))
-                    ) : (
-                        <p style={{padding: '10px', textAlign: 'center'}}>Nenhum usuário encontrado.</p>
-                    )}
-                </ul>
-            </aside>
-
-            {/* COLUNA: CHAT */}
-            <section className="chat-panel" style={{ display: selectedUser && !isVideoPanelVisible ? 'flex' : (selectedUser ? 'none' : 'flex') }}>
+              <main className="chat-messages">
                 {selectedUser ? (
-                    <>
-                    <header className="chat-header">
-                        <span className="chat-user">{selectedUser.username}</span>
-                        <div className="chat-actions">
-                            <button className="btn video" title="Iniciar videochamada" onClick={handleCreateCall} disabled={callState.isJoining || callState.inCall}>📹</button>
-                            <button className="btn clear" title="Limpar chat" onClick={handleClearChat}>🗑</button>
-                            <button className="btn exit" title="Sair" onClick={handleLogout}>Sair</button>
-                        </div>
-                    </header>
-
-                    <main className="chat-messages">
-                        {messages.map(msg => (
-                             <div key={msg.id} className={`msg ${msg.sender_id === session.user.id ? 'sent' : 'received'}`}>
-                                {msg.is_audio ? (
-                                    <AudioPlayer audioUrl={msg.content} />
-                                ) : (
-                                    msg.content
-                                )}
-                             </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                    </main>
-
-                    <footer className="chat-input">
-                        <button 
-                            className="btn mic" 
-                            onMouseDown={handleStartRecording} 
-                            onMouseUp={handleStopRecording} 
-                            onTouchStart={handleStartRecording} 
-                            onTouchEnd={handleStopRecording}
-                            style={{ color: isRecording ? 'red' : 'black' }}
-                        >
-                            🎤
-                        </button>
-                        <form onSubmit={handleSendMessage} style={{display: 'flex', flex: 1}}>
-                            <input 
-                                type="text" 
-                                placeholder={isRecording ? "Gravando áudio..." : "Digite uma mensagem"}
-                                value={newMessage}
-                                onChange={(e) => setNewMessage(e.target.value)}
-                                disabled={isRecording}
-                            />
-                            <button type="submit" className="btn send">➤</button>
-                        </form>
-                    </footer>
-                    </>
+                    messages.map(msg => (
+                         <div key={msg.id} className={`msg ${msg.sender_id === session.user.id ? 'sent' : 'received'}`}>
+                            {msg.is_audio ? (
+                                <AudioPlayer audioUrl={msg.content} />
+                            ) : (
+                                msg.content
+                            )}
+                         </div>
+                    ))
                 ) : (
-                    <div className="chat-placeholder">
-                        <h2>Selecione um contato para começar a conversar.</h2>
-                    </div>
+                    <div style={{textAlign: 'center', marginTop: '20px'}}>Selecione uma conversa</div>
                 )}
-            </section>
+                <div ref={messagesEndRef} />
+              </main>
 
-            {/* COLUNA: VIDEOCHAMADA */}
+              <footer className="chat-input">
+                  <button 
+                      className="btn mic" 
+                      onMouseDown={handleStartRecording} 
+                      onMouseUp={handleStopRecording} 
+                      onTouchStart={handleStartRecording} 
+                      onTouchEnd={handleStopRecording}
+                      style={{ color: isRecording ? 'red' : 'black' }}
+                      disabled={!selectedUser}
+                  >
+                      🎤
+                  </button>
+                <form onSubmit={handleSendMessage} style={{display: 'flex', flex: 1}}>
+                  <input 
+                      type="text" 
+                      placeholder={isRecording ? "Gravando áudio..." : "Digite uma mensagem"}
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      disabled={!selectedUser || isRecording}
+                  />
+                  <button type="submit" className="btn send" disabled={!newMessage.trim()}>➤</button>
+                </form>
+              </footer>
+            </section>
+            
             {isVideoPanelVisible && (
                  <section className="video-panel">
                     <header className="video-header">
@@ -504,17 +471,31 @@ function ChatPage() {
                         <button className="btn exit" onClick={handleEndCall}>Sair</button>
                     </header>
                     <div className="video-area">
-                        <video ref={remoteVideoRef} autoPlay playsInline className="video remote"></video>
-                        <video ref={localVideoRef} autoPlay muted playsInline className="video local"></video>
+                        <div className="video remote"><video ref={remoteVideoRef} autoPlay playsInline></video></div>
+                        <div className="video local"><video ref={localVideoRef} autoPlay muted playsInline></video></div>
                     </div>
                      <footer className="video-controls">
                          <button className="vbtn mic">🎤</button>
                          <button className="vbtn cam">📷</button>
-                         <button className="vbtn call" onClick={handleCreateCall} style={{display: 'none'}}>📞</button>
                          <button className="vbtn end" onClick={handleEndCall}>⛔</button>
                      </footer>
                  </section>
             )}
+
+            <div className="contacts-overlay" style={{ left: isContactsOverlayVisible ? '0' : '-100%' }}>
+              <header className="overlay-header">
+                <span>Contatos</span>
+                <button className="btn close-contacts" onClick={() => setContactsOverlayVisible(false)}>✖</button>
+              </header>
+              <ul className="contacts-list">
+                {users.map(user => (
+                    <li key={user.id} className={`contact ${selectedUser?.id === user.id ? 'active' : ''}`} onClick={() => handleSelectUser(user)}>
+                       <Avatar url={user.avatar_url} size={40} readOnly />
+                       <span style={{marginLeft: '10px'}}>{user.username || 'Usuário'}</span>
+                    </li>
+                ))}
+              </ul>
+            </div>
         </div>
     );
 }
