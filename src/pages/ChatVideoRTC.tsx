@@ -24,7 +24,6 @@ const peerConnectionConfig = {
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun.services.mozilla.com' },
-    // Adicionando um servidor TURN público como fallback
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -152,18 +151,13 @@ function ChatVideoRTC() {
         document.exitFullscreen();
     }
     
-    if (callIdToUpdate && session) {
-        await supabase.from('call_participants')
-            .update({ left_at: new Date().toISOString() })
-            .match({ call_id: callIdToUpdate, user_id: session.user.id });
-    }
-
     cleanupCall(); 
 
     if (callIdToUpdate) {
-      await supabase.from('calls').update({ end_time: new Date().toISOString() }).eq('id', callIdToUpdate);
+      // Notifica o outro lado que a chamada terminou
+      await supabase.from('calls').update({ end_time: new Date().toISOString(), status: 'encerrada' }).eq('id', callIdToUpdate);
     }
-  }, [callState.callId, cleanupCall, session]);
+  }, [callState.callId, cleanupCall]);
 
 
   useEffect(() => {
@@ -192,8 +186,10 @@ function ChatVideoRTC() {
       .channel('public:calls')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: `receiver_id=eq.${session.user.id}` }, 
       (payload) => {
+        // Ignora chamadas que já terminaram ou se já estiver em uma
         if (!payload.new.end_time && !callState.inCall) {
-          supabase.from('profiles').select('id, username, avatar_url').eq('id', payload.new.created_by).single().then(({ data: caller }) => {
+          // Busca o perfil de quem está ligando
+          supabase.from('profiles').select('id, username, avatar_url').eq('id', payload.new.caller_id).single().then(({ data: caller }) => {
             console.log("Chamada recebida detectada:", payload.new);
             setCallState(prev => ({ ...prev, incomingCall: { ...payload.new, caller } }));
           });
@@ -201,6 +197,7 @@ function ChatVideoRTC() {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls' }, 
       (payload) => {
+        // Se a chamada atual foi atualizada com um end_time, encerra
         if (payload.new.id === callState.callId && payload.new.end_time) {
           console.log("Chamada encerrada remotamente.");
           handleEndCall();
@@ -331,23 +328,12 @@ function ChatVideoRTC() {
     const pc = new RTCPeerConnection(peerConnectionConfig);
     peerConnectionRef.current = pc;
 
-    // Adiciona o stream local à conexão
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-    // Configura o handler para quando uma trilha remota é adicionada
     pc.ontrack = event => {
       console.log('Remote stream received!', event.streams[0]);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
-      } else {
-        console.warn('remoteVideoRef.current is null when ontrack fired. Attempting to assign later.');
-        // Fallback: Tenta atribuir novamente se o elemento não estiver pronto
-        const interval = setInterval(() => {
-            if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = event.streams[0];
-                clearInterval(interval);
-            }
-        }, 100);
       }
     };
 
@@ -356,14 +342,12 @@ function ChatVideoRTC() {
 
     pc.onicecandidate = e => {
       if (e.candidate) {
-        console.log('Sending ICE candidate:', e.candidate);
         rtcCh.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
       }
     };
 
     rtcCh.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
       if (payload) {
-        console.log('Received ICE candidate:', payload);
         pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => console.error("Erro ao adicionar ICE candidate:", e));
       }
     });
@@ -371,7 +355,6 @@ function ChatVideoRTC() {
     if (isCaller) {
       rtcCh.on('broadcast', { event: 'answer' }, async ({ payload }) => {
         if (payload && pc.signalingState !== 'stable') {
-          console.log('Received answer:', payload);
           await pc.setRemoteDescription(new RTCSessionDescription(payload));
         }
       });
@@ -380,18 +363,15 @@ function ChatVideoRTC() {
       
       rtcCh.subscribe(status => {
         if (status === 'SUBSCRIBED') {
-          console.log('Sending offer:', offer);
           rtcCh.send({ type: 'broadcast', event: 'offer', payload: offer });
         }
       });
     } else { // Receiver
       rtcCh.on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload) {
-            console.log('Received offer:', payload);
             await pc.setRemoteDescription(new RTCSessionDescription(payload));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log('Sending answer:', answer);
             rtcCh.send({ type: 'broadcast', event: 'answer', payload: answer });
         }
       });
@@ -417,7 +397,7 @@ function ChatVideoRTC() {
     setCallState(prev => ({ ...prev, isJoining: true }));
 
     await getMediaAndStart(async (stream) => {
-      const { data, error } = await supabase.from('calls').insert({ created_by: session.user.id, receiver_id: selectedUser.id }).select().single();
+      const { data, error } = await supabase.from('calls').insert({ caller_id: session.user.id, receiver_id: selectedUser.id, status: 'iniciada' }).select().single();
 
       if (error || !data) {
         console.error("Erro ao criar chamada no DB:", error);
@@ -426,15 +406,6 @@ function ChatVideoRTC() {
       }
       
       const newCallId = data.id;
-      const { error: participantError } = await supabase.from('call_participants').insert({ call_id: newCallId, user_id: session.user.id });
-
-      if (participantError) {
-          console.error("Erro ao adicionar participante:", participantError);
-          await supabase.from('calls').delete().eq('id', newCallId);
-          cleanupCall();
-          return;
-      }
-
       setCallState(prev => ({ ...prev, callId: newCallId, inCall: true, incomingCall: null, isJoining: false }));
       await setupRtcConnection(stream, newCallId, true);
     });
@@ -443,7 +414,6 @@ function ChatVideoRTC() {
   const handleJoinCall = async () => {
     if (!session || !callState.incomingCall) return;
     
-    // Atualiza selectedUser para o chamador se ainda não estiver definido
     if (!selectedUser && callState.incomingCall.caller) {
       setSelectedUser(callState.incomingCall.caller);
     }
@@ -452,13 +422,9 @@ function ChatVideoRTC() {
 
     await getMediaAndStart(async (stream) => {
         const { id: incomingCallId } = callState.incomingCall;
-        const { error: participantError } = await supabase.from('call_participants').insert({ call_id: incomingCallId, user_id: session.user.id });
 
-        if (participantError) {
-            console.error("Erro ao adicionar participante:", participantError);
-            cleanupCall();
-            return;
-        }
+        // Atualiza o status da chamada para 'atendida'
+        await supabase.from('calls').update({ status: 'atendida' }).eq('id', incomingCallId);
 
         setCallState(prev => ({ ...prev, callId: incomingCallId, inCall: true, incomingCall: null, isJoining: false }));
         await setupRtcConnection(stream, incomingCallId, false);
@@ -467,7 +433,7 @@ function ChatVideoRTC() {
 
   const handleDeclineCall = async () => {
     if (!callState.incomingCall) return;
-    await supabase.from('calls').update({ end_time: new Date().toISOString() }).eq('id', callState.incomingCall.id);
+    await supabase.from('calls').update({ end_time: new Date().toISOString(), status: 'recusada' }).eq('id', callState.incomingCall.id);
     setCallState(prev => ({ ...prev, incomingCall: null }));
   };
 

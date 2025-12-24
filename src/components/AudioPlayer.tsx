@@ -1,6 +1,4 @@
 
-import React from 'react';
-
 interface AudioPlayerProps {
   audioUrl: string;
 }
