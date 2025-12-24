@@ -30,9 +30,37 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif
   overflow-y: auto;
   min-height: 0;
 }
-.msg { max-width: 70%; padding: 8px 12px; margin-bottom: 6px; border-radius: 8px; }
+.msg { 
+  max-width: 70%; 
+  padding: 8px 12px; 
+  margin-bottom: 6px; 
+  border-radius: 8px; 
+  position: relative; 
+  display: flex; 
+  align-items: center; 
+}
 .received { background: #fff; }
 .sent { background: #DCF8C6; margin-left: auto; }
+.msg .delete-btn {
+  display: none;
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.1);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+}
+.msg:hover .delete-btn {
+  display: block;
+}
+
 
 /* INPUT CHAT FIXO */
 .chat-input {
@@ -107,8 +135,31 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif
 }
 .overlay-header { background: #075E54; color: white; padding: 12px; display: flex; justify-content: space-between; }
 .contacts-list { list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; }
-.contact { padding: 14px; cursor: pointer; }
+.contact { 
+  padding: 14px; 
+  cursor: pointer; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+}
 .contact:hover, .contact.active { background: #ECE5DD; }
+.contact .remove-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  line-height: 24px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.contact:hover .remove-btn {
+  opacity: 1;
+}
 
 /* POP-UP CHAMADA */
 .incoming-call-popup {
