@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Auth from './Auth'
+import CallPage from './pages/CallPage';
 import Account from './pages/Account' 
 import ChatPage from './pages/ChatPage' // Importa a nova página de Chat
 import { Session } from '@supabase/supabase-js'
@@ -33,7 +34,8 @@ function App() {
   return (
     <BrowserRouter>
       <div className="App">
-        <Routes>
+        <Routes><Route path="/call/:callId" element={<CallPage />} />
+
             {/* A rota principal agora renderiza a ChatPage se o usuário estiver logado */}
             <Route path="/" element={!session ? <Auth /> : <ChatPage />} />
             {/* A rota de conta ainda pode ser acessada se necessário */}
