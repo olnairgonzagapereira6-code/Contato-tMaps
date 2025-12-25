@@ -1,14 +1,27 @@
+
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #d1d7db; }
-.app-container { display: flex; flex-direction: column; height: 100vh; }
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background: #d1d7db;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
 
 /* CHAT PANEL */
 .chat-panel {
   display: flex;
   flex-direction: column;
   background: #ECE5DD;
-  flex: 1;
-  min-height: 0; /* necessário para scroll interno */
+  flex-grow: 1;
+  overflow: hidden; /* Essencial para o layout funcionar bem */
 }
 
 .chat-header {
@@ -18,165 +31,110 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif
   padding: 10px;
   background: #075E54;
   color: white;
-  flex-shrink: 0;
+  flex-shrink: 0; /* Não permite que o header encolha */
 }
+
 .chat-left { display: flex; align-items: center; gap: 10px; }
-.chat-actions .btn { margin-left: 6px; }
+.chat-actions { display: flex; align-items: center; gap: 10px; }
 
 /* MENSAGENS COM SCROLL */
 .chat-messages {
-  flex: 1;
+  flex-grow: 1; /* Faz a área de mensagens ocupar todo o espaço livre */
   padding: 10px;
-  overflow-y: auto;
-  min-height: 0;
-}
-.msg { 
-  max-width: 70%; 
-  padding: 8px 12px; 
-  margin-bottom: 6px; 
-  border-radius: 8px; 
-  position: relative; 
-  display: flex; 
-  align-items: center; 
-}
-.received { background: #fff; }
-.sent { background: #DCF8C6; margin-left: auto; }
-.msg .delete-btn {
-  display: none;
-  position: absolute;
-  right: 5px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.1);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 10px;
-  width: 18px;
-  height: 18px;
-  line-height: 18px;
-  text-align: center;
-}
-.msg:hover .delete-btn {
-  display: block;
+  overflow-y: auto; /* Adiciona a barra de rolagem APENAS aqui */
 }
 
+.message-container {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.message-container.sent {
+    justify-content: flex-end;
+}
+
+.message-container.received {
+    justify-content: flex-start;
+}
+
+.message-bubble {
+    max-width: 70%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    position: relative;
+    word-wrap: break-word;
+}
+
+.message-container.sent .message-bubble {
+    background: #DCF8C6;
+}
+
+.message-container.received .message-bubble {
+    background: #fff;
+}
+
+.message-sender {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #075E54; /* ou qualquer cor que se destaque */
+    margin-bottom: 4px;
+}
+
+.message-time {
+    font-size: 0.7rem;
+    color: #888;
+    text-align: right;
+    margin-top: 4px;
+}
 
 /* INPUT CHAT FIXO */
 .chat-input {
   display: flex;
   padding: 8px;
   background: #f0f0f0;
-  flex-shrink: 0;
-}
-.chat-input input {
-  flex: 1;
-  border-radius: 20px;
-  border: none;
-  padding: 8px;
-  margin: 0 6px;
-}
-
-/* VIDEO PANEL */
-.video-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  background: #000;
-}
-.video-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
-  background: #075E54;
-  color: white;
-  flex-shrink: 0;
-}
-.video-area {
-  display: flex;
-  gap: 6px;
-  flex: 1;
-  padding: 6px;
-}
-.video {
-  flex: 1;
-  background: #111;
-  color: #aaa;
-  display: flex;
+  flex-shrink: 0; /* Não permite que o rodapé encolha */
   align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  min-height: 150px;
-}
-.video-controls {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding: 10px;
-  flex-shrink: 0;
 }
 
-/* BOTÕES */
-.btn { border: none; background: transparent; cursor: pointer; font-size: 16px; }
-.btn.exit { background: #EA4335; color: white; padding: 4px 10px; border-radius: 4px; }
-.btn.send { color: #25D366; font-weight: bold; }
-.btn.notify { font-size: 18px; color: #FFD54F; }
+.message-input { 
+    flex: 1; 
+    border-radius: 20px; 
+    border: 1px solid #ccc; 
+    padding: 10px; 
+    font-size: 1rem; 
+}
 
-/* VIDEO BUTTONS */
-.vbtn { width: 48px; height: 48px; border-radius: 50%; border: none; font-size: 20px; color: white; cursor: pointer; }
-.vbtn.mic, .vbtn.cam { background: #2a2a2a; }
-.vbtn.call { background: #25D366; }
-.vbtn.end { background: #EA4335; }
+/* BOTÕES GERAIS */
+.btn { border: none; background: transparent; cursor: pointer; font-size: 24px; padding: 5px; color: #54656f; }
+.btn.exit { background: #d9534f; color: white; padding: 6px 12px; border-radius: 5px; font-size: 0.9rem; }
+.btn.send { color: #075E54; margin-left: 8px; }
+.btn.mic, .btn.stop-recording { color: #075E54; margin-left: 8px; }
 
 /* CONTATOS OVERLAY */
-.contacts-overlay {
-  position: fixed; top: 0; left: -100%; width: 100%; height: 100%; background: #fff;
-  display: flex; flex-direction: column; z-index: 999;
-}
-.overlay-header { background: #075E54; color: white; padding: 12px; display: flex; justify-content: space-between; }
+.contacts-overlay { position: fixed; top: 0; left: -100%; width: 100%; max-width: 400px; height: 100%; background: #fff; display: flex; flex-direction: column; z-index: 1000; transition: left 0.3s ease; box-shadow: 4px 0px 15px rgba(0,0,0,0.2); }
+.overlay-header { background: #075E54; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+.overlay-header span { font-size: 1.2rem; }
 .contacts-list { list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; }
-.contact { 
-  padding: 14px; 
-  cursor: pointer; 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-}
+.contact { padding: 12px 15px; cursor: pointer; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #f0f0f0; }
 .contact:hover, .contact.active { background: #ECE5DD; }
-.contact .remove-btn {
-  background: #f44336;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
-  line-height: 24px;
-  text-align: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.contact:hover .remove-btn {
-  opacity: 1;
-}
 
-/* POP-UP CHAMADA */
-.incoming-call-popup {
-  position: fixed; top: 20px; left: 50%;
-  transform: translateX(-50%);
-  background: #25D366;
-  color: white;
-  padding: 12px 20px;
-  border-radius: 24px;
-  font-weight: bold;
-  z-index: 1000;
-  text-align: center;
-}
+/* BOTÃO DE NOTIFICAÇÃO */
+.btn.notify { font-size: 22px; color: #FFD54F; position: relative; }
+.btn.notify.subscribed { color: #4CAF50; }
+.btn.notify.unsupported { display: none; }
 
-/* RESPONSIVO MOBILE FULLSCREEN */
+/* POP-UP DE CHAMADA RECEBIDA */
+.incoming-call-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(5px); }
+.incoming-call-box { background: white; border-radius: 16px; padding: 24px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.25); animation: slideIn 0.3s ease-out; width: 90%; max-width: 320px; }
+.incoming-call-box h3 { margin-top: 0; color: #333; font-size: 1.4rem; }
+.incoming-call-box p { margin: 10px 0 20px; color: #555; }
+.incoming-call-actions { display: flex; justify-content: space-around; gap: 15px; }
+.btn.accept-call, .btn.decline-call { border-radius: 50%; width: 60px; height: 60px; font-size: 24px; color: white; border: none; display: flex; align-items: center; justify-content: center; }
+.btn.accept-call { background-color: #4CAF50; }
+.btn.decline-call { background-color: #f44336; }
+
+@keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
 @media screen and (max-width: 768px) {
-  .video-area { flex-direction: column; }
-  .video { min-height: 120px; }
-  .chat-input input { font-size: 16px; }
+  .message-input { font-size: 16px; }
 }

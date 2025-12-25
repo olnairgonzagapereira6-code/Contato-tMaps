@@ -1,0 +1,22 @@
+
+.audio-player-container {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Espaço entre o player e a duração */
+}
+
+.audio-element {
+  width: 200px; /* Largura padrão para o player */
+  height: 40px;
+}
+
+.duration-text {
+  font-size: 0.9em;
+  color: #666;
+  font-weight: 500;
+}
+
+/* No modo escuro ou em balões de mensagem enviados */
+.sent .duration-text {
+  color: #f1f1f1;
+}

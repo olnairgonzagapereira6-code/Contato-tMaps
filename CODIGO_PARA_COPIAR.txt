@@ -1,0 +1,396 @@
+## ======================================================================
+## ARQUIVO 1 de 4: Adicionar ao final de `new_schema.sql`
+## ======================================================================
+
+-- Função para encontrar um chat privado existente ou criar um novo
+CREATE OR REPLACE FUNCTION public.find_or_create_private_chat(other_user_id UUID)
+RETURNS UUID AS $$
+DECLARE
+    chat_id UUID;
+    current_user_id UUID := auth.uid();
+BEGIN
+    -- Tenta encontrar um chat privado existente entre os dois usuários
+    SELECT c.id INTO chat_id
+    FROM chats AS c
+    JOIN chat_participants AS cp1 ON c.id = cp1.chat_id
+    JOIN chat_participants AS cp2 ON c.id = cp2.chat_id
+    WHERE c.is_group = false
+      AND cp1.user_id = current_user_id
+      AND cp2.user_id = other_user_id;
+
+    -- Se não encontrar, cria um novo
+    IF chat_id IS NULL THEN
+        INSERT INTO public.chats (is_group, created_by)
+        VALUES (false, current_user_id)
+        RETURNING id INTO chat_id;
+
+        INSERT INTO public.chat_participants (chat_id, user_id)
+        VALUES (chat_id, current_user_id), (chat_id, other_user_id);
+    END IF;
+
+    RETURN chat_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
+## ======================================================================
+## ARQUIVO 2 de 4: Criar novo arquivo em `src/pages/CallPage.css`
+## ======================================================================
+
+.call-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    height: 100vh;
+    background-color: #2c2c2c;
+    color: white;
+    position: relative;
+}
+
+.call-videos {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#remote-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-color: #000;
+}
+
+#local-video {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 25%;
+    max-width: 200px;
+    height: auto;
+    border-radius: 10px;
+    border: 2px solid #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    background-color: #1a1a1a;
+}
+
+.call-controls {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    background-color: rgba(0, 0, 0, 0.4);
+    padding: 15px 25px;
+    border-radius: 30px;
+}
+
+.call-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.hang-up {
+    background-color: #f44336; /* Red */
+    color: white;
+}
+
+.mute-mic, .toggle-video {
+    background-color: #607d8b; /* Grey */
+    color: white;
+}
+
+.call-btn.inactive {
+    background-color: #f44336;
+}
+
+.call-status {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.5);
+    padding: 8px 16px;
+    border-radius: 15px;
+    font-size: 1.1rem;
+}
+
+
+## ======================================================================
+## ARQUIVO 3 de 4: Criar novo arquivo em `src/pages/CallPage.tsx`
+## ======================================================================
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
+import { RealtimeChannel, Session } from '@supabase/supabase-js';
+import './CallPage.css';
+import { Call } from '../types';
+
+const peerConnectionConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ],
+};
+
+function CallPage() {
+    const { callId } = useParams();
+    const navigate = useNavigate();
+    const [session, setSession] = useState<Session | null>(null);
+    const [call, setCall] = useState<Call | null>(null);
+    const [status, setStatus] = useState('Conectando...');
+
+    const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+    const localStreamRef = useRef<MediaStream | null>(null);
+    const remoteStreamRef = useRef<MediaStream | null>(null);
+    const rtcChannelRef = useRef<RealtimeChannel | null>(null);
+
+    const localVideoRef = useRef<HTMLVideoElement>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+    
+    const [isMicMuted, setMicMuted] = useState(false);
+    const [isVideoEnabled, setVideoEnabled] = useState(true);
+
+    const cleanup = useCallback(() => {
+        console.log('Cleaning up call resources...');
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current = null;
+        }
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+        }
+        if (rtcChannelRef.current) {
+            supabase.removeChannel(rtcChannelRef.current);
+            rtcChannelRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        const init = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                navigate('/');
+                return;
+            }
+            setSession(session);
+
+            const { data: callData, error } = await supabase.from('calls').select('*').eq('id', callId).single();
+            if (error || !callData) {
+                console.error('Call not found');
+                navigate('/chat');
+                return;
+            }
+            setCall(callData as Call);
+            initCall(session.user.id, callData);
+        };
+        init();
+
+        window.addEventListener('beforeunload', cleanup);
+
+        return () => {
+            cleanup();
+            window.removeEventListener('beforeunload', cleanup);
+        };
+    }, [callId, navigate, cleanup]);
+
+    const initCall = async (userId: string, callData: Call) => {
+        try {
+            setStatus('Iniciando câmera e microfone...');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            localStreamRef.current = stream;
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+
+            peerConnectionRef.current = new RTCPeerConnection(peerConnectionConfig);
+            
+            stream.getTracks().forEach(track => peerConnectionRef.current!.addTrack(track, stream));
+
+            peerConnectionRef.current.onicecandidate = event => {
+                if (event.candidate && rtcChannelRef.current) {
+                    rtcChannelRef.current.send({
+                        type: 'broadcast',
+                        event: 'ice-candidate',
+                        payload: { candidate: event.candidate },
+                    });
+                }
+            };
+
+            peerConnectionRef.current.ontrack = event => {
+                remoteStreamRef.current = event.streams[0];
+                if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStreamRef.current;
+                }
+                setStatus('Conectado');
+            };
+            
+            peerConnectionRef.current.onconnectionstatechange = () => {
+                const state = peerConnectionRef.current?.connectionState;
+                if (state === 'disconnected' || state === 'closed' || state === 'failed') {
+                    handleHangUp();
+                }
+            };
+
+            setupRtcChannel(userId, callData.id);
+            
+            if (callData.caller_id === userId) {
+                setStatus('Chamando...');
+                const offer = await peerConnectionRef.current.createOffer();
+                await peerConnectionRef.current.setLocalDescription(offer);
+                rtcChannelRef.current!.send({
+                    type: 'broadcast',
+                    event: 'offer',
+                    payload: { offer },
+                });
+            }
+
+        } catch (error) {
+            console.error("Error initializing call:", error);
+            setStatus('Falha ao iniciar. Verifique as permissões.');
+        }
+    };
+    
+    const setupRtcChannel = (userId: string, currentCallId: string) => {
+        const channel = supabase.channel(`call:${currentCallId}`, { config: { broadcast: { self: false } } });
+
+        channel.on('broadcast', { event: 'offer' }, async ({ payload }) => {
+            if (call?.callee_id === userId) {
+                 await peerConnectionRef.current!.setRemoteDescription(new RTCSessionDescription(payload.offer));
+                 const answer = await peerConnectionRef.current!.createAnswer();
+                 await peerConnectionRef.current!.setLocalDescription(answer);
+                 channel.send({ type: 'broadcast', event: 'answer', payload: { answer } });
+            }
+        });
+
+        channel.on('broadcast', { event: 'answer' }, async ({ payload }) => {
+             if (call?.caller_id === userId) {
+                await peerConnectionRef.current!.setRemoteDescription(new RTCSessionDescription(payload.answer));
+             }
+        });
+
+        channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
+            await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        });
+
+        channel.on('broadcast', { event: 'hang-up' }, () => {
+            setStatus('Chamada finalizada');
+            setTimeout(handleHangUp, 1500);
+        });
+
+        channel.subscribe();
+        rtcChannelRef.current = channel;
+    };
+
+    const handleHangUp = useCallback(async () => {
+        cleanup();
+        if (rtcChannelRef.current) {
+            rtcChannelRef.current.send({ type: 'broadcast', event: 'hang-up' });
+        }
+        if (callId) {
+            await supabase.from('calls').update({ status: 'ended' }).eq('id', callId);
+        }
+        navigate('/chat');
+    }, [callId, navigate, cleanup]);
+
+    const toggleMic = () => {
+        localStreamRef.current?.getAudioTracks().forEach(track => {
+            track.enabled = !track.enabled;
+            setMicMuted(!track.enabled);
+        });
+    };
+
+    const toggleVideo = () => {
+        localStreamRef.current?.getVideoTracks().forEach(track => {
+            track.enabled = !track.enabled;
+            setVideoEnabled(!track.enabled);
+        });
+    };
+
+    return (
+        <div className="call-container">
+            <div className="call-status">{status}</div>
+            <div className="call-videos">
+                <video id="remote-video" ref={remoteVideoRef} autoPlay playsInline></video>
+                <video id="local-video" ref={localVideoRef} autoPlay playsInline muted></video>
+            </div>
+            <div className="call-controls">
+                <button onClick={toggleMic} className={`call-btn mute-mic ${isMicMuted ? 'inactive' : ''}`}>
+                    {isMicMuted ? '🔇' : '🎤'}
+                </button>
+                <button onClick={handleHangUp} className="call-btn hang-up">
+                    📞
+                </button>
+                 <button onClick={toggleVideo} className={`call-btn toggle-video ${!isVideoEnabled ? 'inactive' : ''}`}>
+                    {isVideoEnabled ? '📹' : '🚫'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+export default CallPage;
+
+
+## ======================================================================
+## ARQUIVO 4 de 4: Atualizar o arquivo `src/App.tsx`
+## ======================================================================
+
+## Adicione a linha `import CallPage from './pages/CallPage';` perto dos outros imports.
+## Adicione a linha `<Route path="/call/:callId" element={<CallPage />} />` dentro do <Routes>.
+
+## Exemplo de como o arquivo App.tsx deve ficar:
+
+import { useEffect, useState } from 'react';
+import { supabase } from './supabaseClient';
+import { Session } from '@supabase/supabase-js';
+import { Routes, Route, BrowserRouter } from "react-router-dom";
+import Account from './Account';
+import Auth from './Auth';
+import ChatPage from './pages/ChatPage';
+import CallPage from './pages/CallPage'; // <-- ADICIONAR IMPORT
+
+function App() {
+  const [session, setSession] = useState<Session | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  return (
+    <BrowserRouter>
+        <Routes>
+            <Route path="/" element={!session ? <Auth /> : <Account session={session} />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/call/:callId" element={<CallPage />} /> {/* <-- ADICIONAR ROTA */}
+        </Routes>
+    </BrowserRouter>
+  )
+}
+
+export default App

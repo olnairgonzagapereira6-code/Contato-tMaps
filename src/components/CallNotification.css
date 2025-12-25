@@ -1,0 +1,72 @@
+
+.call-notification-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.call-notification-popup {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  width: 90%;
+  max-width: 380px;
+}
+
+.call-notification-popup h2 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.6rem;
+}
+
+.call-notification-popup p {
+  color: #555;
+  font-size: 1.1rem;
+  margin: 1rem 0 2rem 0;
+}
+
+.call-notification-actions {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+}
+
+.call-notification-actions button {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  width: 120px;
+}
+
+.accept-btn {
+  background-color: #28a745; /* Verde */
+  color: white;
+}
+
+.accept-btn:hover {
+  background-color: #218838;
+  transform: translateY(-2px);
+}
+
+.decline-btn {
+  background-color: #dc3545; /* Vermelho */
+  color: white;
+}
+
+.decline-btn:hover {
+  background-color: #c82333;
+  transform: translateY(-2px);
+}
