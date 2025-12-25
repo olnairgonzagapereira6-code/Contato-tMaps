@@ -6,7 +6,7 @@ import { Session } from '@supabase/supabase-js'
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
 import Account from './pages/Account'
 import ChatVideoRTC from './pages/ChatVideoRTC'
-import CallNotification from './components/CallNotification' // Importado
+import CallNotification from './components/CallNotification'
 
 function App() {
     const [session, setSession] = useState<Session | null>(null)
