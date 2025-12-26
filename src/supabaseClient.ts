@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://pahmorxorucpioppmjza.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhaG1vcnhvcnVjcGlvcHBtanphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMjE4MDAsImV4cCI6MjA4MTg5NzgwMH0.W0Nle409r_pKc3xsJhbVTBgjfLVJWLpWXs8lupx-qnw'
+// Estas variáveis serão configuradas no painel da Vercel/Netlify
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Erro: As chaves do Supabase não foram encontradas. Verifique as variáveis de ambiente.")
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
