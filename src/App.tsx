@@ -10,23 +10,28 @@ import CallNotification from './components/CallNotification'
 
 function App() {
     const [session, setSession] = useState<Session | null>(null)
-    const [incomingCall, setIncomingCall] = useState<any>(null);
-    const [callerProfile, setCallerProfile] = useState<any>(null);
-    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true) // Novo: Estado de carregamento
+    const [incomingCall, setIncomingCall] = useState<any>(null)
+    const [callerProfile, setCallerProfile] = useState<any>(null)
+    const navigate = useNavigate()
 
     useEffect(() => {
+        // Verifica a sessão atual ao abrir o app
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session)
+            setLoading(false)
         })
 
+        // Escuta mudanças na autenticação (login/logout)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session)
+            setLoading(false)
         })
 
         return () => subscription.unsubscribe()
     }, [])
 
-    // Listener para chamadas recebidas
+    // Listener para chamadas recebidas via Supabase Realtime
     useEffect(() => {
         if (!session?.user?.id) return;
 
@@ -34,17 +39,19 @@ function App() {
             .channel('public:calls')
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'calls', filter: `receiver_id=eq.${session.user.id}` },
+                { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'calls', 
+                    filter: `receiver_id=eq.${session.user.id}` 
+                },
                 async (payload) => {
                     if (payload.new && payload.new.status === 'initiated') {
-                        // Busca o perfil de quem está ligando
-                        const { data: profile, error } = await supabase
+                        const { data: profile } = await supabase
                             .from('profiles')
                             .select('full_name, username')
                             .eq('id', payload.new.caller_id)
                             .single();
-                        
-                        if (error) console.error("Erro ao buscar perfil do chamador:", error);
                         
                         setCallerProfile(profile);
                         setIncomingCall(payload.new);
@@ -60,28 +67,21 @@ function App() {
 
     const handleAcceptCall = async () => {
         if (!incomingCall) return;
-
-        await supabase
-            .from('calls')
-            .update({ status: 'answered' })
-            .eq('id', incomingCall.id);
-            
+        await supabase.from('calls').update({ status: 'answered' }).eq('id', incomingCall.id);
         navigate(`/chat`, { state: { selectedUser: { id: incomingCall.caller_id, ...callerProfile } } });
         setIncomingCall(null);
-        setCallerProfile(null);
     };
 
     const handleDeclineCall = async () => {
         if (!incomingCall) return;
-
-        await supabase
-            .from('calls')
-            .update({ status: 'declined', end_time: new Date().toISOString() })
-            .eq('id', incomingCall.id);
-        
+        await supabase.from('calls').update({ status: 'declined' }).eq('id', incomingCall.id);
         setIncomingCall(null);
-        setCallerProfile(null);
     };
+
+    // Enquanto estiver verificando se o usuário está logado, mostra uma tela vazia ou carregando
+    if (loading) {
+        return <div className="loading-screen">Carregando TheZap...</div>
+    }
 
     return (
         <div className="container">
@@ -93,15 +93,20 @@ function App() {
                 />
             )}
             <Routes>
+                {/* Se não houver sessão, mostra Auth. Se houver, vai para Account */}
                 <Route path="/" element={!session ? <Auth /> : <Navigate to="/account" />} />
-                <Route path="/account" element={!session ? <Navigate to="/" /> : <Account key={session.user.id} session={session} />} />
+                
+                {/* Rotas protegidas: só acessa se tiver session */}
+                <Route path="/account" element={!session ? <Navigate to="/" /> : <Account session={session} />} />
                 <Route path="/chat" element={!session ? <Navigate to="/" /> : <ChatVideoRTC />} />
+                
+                {/* Rota de segurança para caminhos inexistentes */}
+                <Route path="*" element={<Navigate to="/" />} />
             </Routes>
         </div>
     );
 }
 
-// Componente wrapper para usar o `useNavigate`
 const AppWrapper = () => (
     <Router>
         <App />
