@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import Avatar from "../Avatar";
@@ -18,215 +17,196 @@ export default function Account({ session }: { session: Session }) {
 
   useEffect(() => {
     let ignore = false;
-    async function getProfile() {
+
+    async function fetchData() {
       setLoading(true);
-      const { user } = session;
+      try {
+        const { user } = session;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(`username, website, avatar_url`)
-        .eq("id", user.id)
-        .single();
+        // 1. Busca perfil do usuário logado
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select(`username, website, avatar_url`)
+          .eq("id", user.id)
+          .single();
 
-      if (!ignore) {
-        if (error) {
-          console.warn(error);
-        } else if (data) {
-          setUsername(data.username);
-          setWebsite(data.website);
-          setAvatarUrl(data.avatar_url);
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 é "não encontrado", normal se for novo
+           console.warn("Erro ao buscar perfil:", profileError.message);
         }
-      }
 
-      setLoading(false);
+        if (!ignore && profileData) {
+          setUsername(profileData.username);
+          setWebsite(profileData.website);
+          setAvatarUrl(profileData.avatar_url);
+        }
+
+        // 2. Busca lista de todos os usuários
+        const { data: allUsers, error: usersError } = await supabase
+          .from("profiles")
+          .select("*")
+          .order('username', { ascending: true });
+
+        if (!ignore) {
+          if (usersError) console.error("Erro ao buscar usuários:", usersError.message);
+          else setUsers(allUsers || []);
+        }
+
+      } catch (err) {
+        console.error("Erro geral no carregamento:", err);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
     }
 
-    async function getUsers() {
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (error) {
-        console.error("Error fetching users:", error);
-      } else {
-        setUsers(data);
-      }
-    }
-
-    getProfile();
-    getUsers();
+    fetchData();
 
     return () => {
       ignore = true;
     };
   }, [session]);
 
-  // Modificado para aceitar uma nova URL de avatar diretamente
   async function updateProfile(
     event: React.FormEvent<HTMLFormElement> | null,
     newAvatarUrl?: string
   ) {
-    if (event) {
-      event.preventDefault();
-    }
+    if (event) event.preventDefault();
 
     setLoading(true);
-    const { user } = session;
+    try {
+      const { user } = session;
+      const updates = {
+        id: user.id,
+        username,
+        website,
+        avatar_url: newAvatarUrl !== undefined ? newAvatarUrl : avatar_url,
+        updated_at: new Date(),
+      };
 
-    const updates = {
-      id: user.id,
-      username,
-      website,
-      // Usa a nova URL se fornecida, senão, mantém a antiga.
-      avatar_url: newAvatarUrl !== undefined ? newAvatarUrl : avatar_url,
-      updated_at: new Date(),
-    };
-
-    const { error } = await supabase.from("profiles").upsert(updates);
-
-    if (error) {
-      alert("Erro ao atualizar os dados!");
-      console.log(error);
-    } else {
-      // Atualiza o estado local da URL do avatar se uma nova foi salva.
-      if (newAvatarUrl !== undefined) {
-        setAvatarUrl(newAvatarUrl);
-      }
+      const { error } = await supabase.from("profiles").upsert(updates);
+      if (error) throw error;
+      
+      if (newAvatarUrl !== undefined) setAvatarUrl(newAvatarUrl);
+      alert("Perfil atualizado com sucesso!");
+    } catch (error: any) {
+      alert("Erro ao atualizar os dados: " + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   const handleCopyList = () => {
-    const userList = users.map((user) => user.username || "Unnamed User").join("\n");
-    navigator.clipboard
-      .writeText(userList)
+    const userList = users.map((user) => user.username || "Usuário sem nome").join("\n");
+    navigator.clipboard.writeText(userList)
       .then(() => alert("Lista de usuários copiada!"))
-      .catch((err) => console.error("Falha ao copiar lista: ", err));
+      .catch((err) => console.error("Falha ao copiar:", err));
   };
 
   const handleShareList = () => {
-    const userList = users.map((user) => user.username || "Unnamed User").join("\n");
+    const userList = users.map((user) => user.username || "Usuário sem nome").join("\n");
     if (navigator.share) {
-      navigator
-        .share({
-          title: "Lista de Usuários",
-          text: userList,
-        })
-        .catch((err) => console.error("Erro ao compartilhar: ", err));
+      navigator.share({ title: "Lista de Usuários TheZap", text: userList })
+        .catch((err) => console.error("Erro ao compartilhar:", err));
     } else {
-      alert("A função de compartilhar não é suportada neste navegador.");
+      alert("Compartilhamento não suportado neste navegador.");
     }
   };
 
   const generatePdf = () => {
     const input = document.getElementById("contacts-list");
-    if (!input) {
-      alert("Não foi possível encontrar a lista para gerar o PDF.");
-      return;
-    }
+    if (!input) return;
 
     html2canvas(input, { useCORS: true }).then((canvas) => {
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF();
-      const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
+      const imgProps = pdf.getImageProperties(imgData);
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save("lista_contatos.pdf");
+      pdf.save("contatos_thezap.pdf");
     });
   };
 
   return (
     <div className="account-container">
       <div className="account-header">
-        <h1 className="header">Sua Conta</h1>
+        <h1 className="header">TheZap - Conta</h1>
         <div className="menu-buttons">
           <div className="dropdown-container">
-            <button
-              className="button primary"
-              onClick={() => setDropdownVisible(!dropdownVisible)}
-            >
+            <button className="button primary" onClick={() => setDropdownVisible(!dropdownVisible)}>
               Ações
             </button>
             {dropdownVisible && (
               <div className="dropdown-menu">
-                <button onClick={() => { handleCopyList(); setDropdownVisible(false); }}>
-                  Copiar Lista
-                </button>
-                <button onClick={() => { handleShareList(); setDropdownVisible(false); }}>
-                  Compartilhar Lista
-                </button>
-                <button onClick={() => { generatePdf(); setDropdownVisible(false); }}>
-                  Gerar PDF da Lista
-                </button>
+                <button onClick={() => { handleCopyList(); setDropdownVisible(false); }}>Copiar Lista</button>
+                <button onClick={() => { handleShareList(); setDropdownVisible(false); }}>Compartilhar</button>
+                <button onClick={() => { generatePdf(); setDropdownVisible(false); }}>Baixar PDF</button>
               </div>
             )}
           </div>
-          <Link to="/chat" className="button">
-            Entrar no Chat
-          </Link>
-          <button
-            className="button button-logout"
-            type="button"
-            onClick={() => supabase.auth.signOut()}
-          >
+          <Link to="/chat" className="button chat-link">Ir para o Chat</Link>
+          <button className="button button-logout" type="button" onClick={() => supabase.auth.signOut()}>
             Sair
           </button>
         </div>
       </div>
 
       <div className="account-content">
-        <form onSubmit={updateProfile} className="form-widget">
-          <Avatar
-            url={avatar_url}
-            size={150}
-            onUpload={(url) => {
-              // Passa a nova URL diretamente para a função de atualização
-              updateProfile(null, url);
-            }}
-          />
-          <div>
-            <label htmlFor="email">Email</label>
-            <input id="email" type="text" value={session.user.email} disabled />
-          </div>
-          <div>
-            <label htmlFor="username">Nome</label>
-            <input
-              id="username"
-              type="text"
-              value={username || ""}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="website">Website</label>
-            <input
-              id="website"
-              type="url"
-              value={website || ""}
-              onChange={(e) => setWebsite(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <button
-              className="button block primary"
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Carregando..." : "Atualizar Perfil"}
-            </button>
-          </div>
-        </form>
-
-        <div id="contacts-list" className="user-list-section">
-          <h2 className="header">Contatos</h2>
-          <div className="user-list">
-            {users.map((user, index) => (
-              <div key={index} className="user-list-item">
-                <Avatar url={user.avatar_url} size={50} readOnly={true} />
-                <span>{user.username || "Unnamed"}</span>
+        {loading ? (
+          <p>Carregando dados...</p>
+        ) : (
+          <>
+            <form onSubmit={updateProfile} className="form-widget">
+              <Avatar
+                url={avatar_url}
+                size={150}
+                onUpload={(url) => updateProfile(null, url)}
+              />
+              <div className="input-group">
+                <label>Email (Login)</label>
+                <input type="text" value={session.user.email} disabled className="input-disabled" />
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="input-group">
+                <label htmlFor="username">Seu Nome</label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username || ""}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Como quer ser chamado?"
+                />
+              </div>
+              <div className="input-group">
+                <label htmlFor="website">Link/Website</label>
+                <input
+                  id="website"
+                  type="url"
+                  value={website || ""}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://exemplo.com"
+                />
+              </div>
+              <button className="button block primary" type="submit" disabled={loading}>
+                Salvar Alterações
+              </button>
+            </form>
+
+            <div id="contacts-list" className="user-list-section">
+              <h2 className="header">Contatos na Rede</h2>
+              <div className="user-list">
+                {users.length > 0 ? (
+                  users.map((user) => (
+                    <div key={user.id} className="user-list-item">
+                      <Avatar url={user.avatar_url} size={40} readOnly={true} />
+                      <span>{user.username || "Usuário sem nome"}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p>Nenhum outro usuário encontrado.</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
