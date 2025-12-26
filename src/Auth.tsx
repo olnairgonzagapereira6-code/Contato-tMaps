@@ -1,40 +1,48 @@
-
 import { useState } from "react";
 import { supabase } from "./supabaseClient";
-import './Auth.css'; // Importando o CSS para estilização
+import './Auth.css'; 
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [authView, setAuthView] = useState("sign_in"); // 'sign_in', 'sign_up', 'magic_link'
+  const [authView, setAuthView] = useState("sign_in"); 
 
   const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    if (authView === 'magic_link') {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: `${window.location.origin}/chat` },
-      });
-      if (error) alert(error.message);
-      else alert("Verifique seu e-mail para o link de login!");
+    // Pega a URL atual para redirecionamento após login/cadastro
+    const redirectUrl = window.location.origin + "/account";
 
-    } else if (authView === 'sign_up') {
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: { emailRedirectTo: `${window.location.origin}/chat` },
-      });
-      if (error) alert(error.message);
-      else alert("Cadastro realizado! Verifique seu e-mail para confirmação.");
+    try {
+      if (authView === 'magic_link') {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: redirectUrl },
+        });
+        if (error) throw error;
+        alert("Verifique seu e-mail para o link de login!");
 
-    } else { // sign_in
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message);
+      } else if (authView === 'sign_up') {
+        const { error } = await supabase.auth.signUp({
+          email, 
+          password,
+          options: { emailRedirectTo: redirectUrl },
+        });
+        if (error) throw error;
+        alert("Cadastro realizado! Verifique seu e-mail para confirmação.");
+
+      } else { // sign_in
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // O Supabase onAuthStateChange no App.tsx cuidará do redirecionamento
+      }
+    } catch (error: any) {
+      alert(error.message || "Ocorreu um erro na autenticação");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const renderForm = () => {
@@ -45,7 +53,6 @@ export default function Auth() {
             <h2 className="auth-title">Criar Nova Conta</h2>
             <p className="auth-description">Preencha os campos para se registrar.</p>
             <input
-              id="email"
               className="inputField"
               type="email"
               placeholder="Seu e-mail"
@@ -54,7 +61,6 @@ export default function Auth() {
               required
             />
             <input
-              id="password"
               className="inputField"
               type="password"
               placeholder="Crie uma senha forte"
@@ -62,7 +68,7 @@ export default function Auth() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <button type="submit" className={"button primary"} disabled={loading}>
+            <button type="submit" className="button primary" disabled={loading}>
               {loading ? "Registrando..." : "Cadastrar"}
             </button>
           </>
@@ -71,9 +77,8 @@ export default function Auth() {
         return (
           <>
             <h2 className="auth-title">Login com Magic Link</h2>
-            <p className="auth-description">Enviaremos um link para seu e-mail. Sem senha, sem complicação.</p>
+            <p className="auth-description">Enviaremos um link para seu e-mail.</p>
             <input
-              id="email"
               className="inputField"
               type="email"
               placeholder="Seu e-mail"
@@ -81,7 +86,7 @@ export default function Auth() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <button type="submit" className={"button primary"} disabled={loading || !email}>
+            <button type="submit" className="button primary" disabled={loading || !email}>
               {loading ? "Enviando..." : "Enviar Magic Link"}
             </button>
           </>
@@ -92,7 +97,6 @@ export default function Auth() {
             <h2 className="auth-title">Bem-vindo de volta!</h2>
             <p className="auth-description">Faça login para continuar.</p>
             <input
-              id="email"
               className="inputField"
               type="email"
               placeholder="Seu e-mail"
@@ -101,7 +105,6 @@ export default function Auth() {
               required
             />
             <input
-              id="password"
               className="inputField"
               type="password"
               placeholder="Sua senha"
@@ -109,7 +112,7 @@ export default function Auth() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <button type="submit" className={"button primary"} disabled={loading}>
+            <button type="submit" className="button primary" disabled={loading}>
               {loading ? "Entrando..." : "Login"}
             </button>
           </>
@@ -129,15 +132,17 @@ export default function Auth() {
         </form>
 
         <footer className="auth-footer">
-            {authView !== 'sign_in' &&
-                <button onClick={() => setAuthView('sign_in')} className="toggle-button">Já tem conta? <strong>Faça Login</strong></button>
-            }
-            {authView !== 'sign_up' &&
-                <button onClick={() => setAuthView('sign_up')} className="toggle-button">Não tem conta? <strong>Cadastre-se</strong></button>
-            }
-            {authView !== 'magic_link' &&
-                <button onClick={() => setAuthView('magic_link')} className="toggle-button">Prefere um <strong>Magic Link</strong>?</button>
-            }
+            <div className="toggle-group">
+                {authView !== 'sign_in' &&
+                    <button type="button" onClick={() => setAuthView('sign_in')} className="toggle-button">Já tem conta? <strong>Entrar</strong></button>
+                }
+                {authView !== 'sign_up' &&
+                    <button type="button" onClick={() => setAuthView('sign_up')} className="toggle-button">Criar <strong>Conta</strong></button>
+                }
+                {authView !== 'magic_link' &&
+                    <button type="button" onClick={() => setAuthView('magic_link')} className="toggle-button">Usar <strong>Link Mágico</strong></button>
+                }
+            </div>
         </footer>
       </div>
     </div>
